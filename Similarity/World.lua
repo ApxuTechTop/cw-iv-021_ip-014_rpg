@@ -106,7 +106,23 @@ local locationMeta = {
             self.loot[#self.loot + 1] = loot
         end,
         addLootItem = function(self, item, pos)
-            -- TODO добавить item в loot ближайший к pos
+            if #self.loot == 0 then
+                return locationMeta.__index.newLoot(self, {pos = pos, items = {item}})
+            end
+            local min = math.distance(self.loot[1].pos, pos)
+            local minI = 1
+            for i = 2, #self.loot do
+                if math.distance(self.loot[i].pos, pos) < min then
+                    min = math.distance(self.loot[i].pos, pos)
+                    minI = i
+                end
+            end
+            if min <= 0.05 then
+                self.loot[minI].items[#self.loot[minI].items + 1] = item
+                return self.loot[minI]
+            else
+                return locationMeta.__index.newLoot(self, {pos = pos, items = {item}})
+            end
         end,
         removeLoot = function(self, loot)
             if type(loot) == "table" then
@@ -121,7 +137,7 @@ local locationMeta = {
                 error("Expected number or table", 1)
             end
         end,
-        newLoot = function(options)
+        newLoot = function(self, options)
             local loot = {}
             setmetatable(loot, lootMeta);
             return loot
