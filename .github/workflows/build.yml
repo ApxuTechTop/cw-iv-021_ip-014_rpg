@@ -28,7 +28,7 @@ jobs:
                 target: public/
             
           - name: Install Corona
-            run: msiexec.exe /i public/${{ steps.<step-id>.filename }} /quiet
+            run: msiexec.exe /i public/${{ steps.downloadfile.filename }} /quiet
             
           - name: Build application
             run: make build
