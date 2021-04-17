@@ -113,11 +113,14 @@ Gui.createButton = function(options)
         options.parent:insert(button)
     end
     button.x, button.y = options.x, options.y
-    button.background = display.newRoundedRect(button, 0, 0, options.width, options.height,
-                                               options.cornerRadius or options.width * 0.05)
-    button.defaultColor = options.defaultColor or Gui.color.buttonBackground.none
-    button.overColor = options.overColor
-    button.background.fill = button.defaultColor
+    if not options.noBackground then
+        button.background = display.newRoundedRect(button, 0, 0, options.width, options.height,
+                                                   options.cornerRadius or options.width * 0.05)
+        button.defaultColor = options.defaultColor or Gui.color.buttonBackground.none
+        button.overColor = options.overColor
+        button.background.fill = button.defaultColor
+    end
+
     if options.text then
         button.text = display.newText {
             parent = button,
@@ -143,8 +146,11 @@ Gui.createButton = function(options)
     for key, value in pairs(buttonMeta.__index) do
         button[key] = value
     end
-    button:addEventListener("touch", button)
-    button:addEventListener("tap", button)
+    if not options.noListeners then
+        button:addEventListener("touch", button)
+        button:addEventListener("tap", button)
+    end
+    
     return button
 end
 
@@ -182,11 +188,7 @@ Gui.createItemDescription = function()
 
 end
 
-local locationMeta = {
-    __index = {
-
-    }
-}
+local locationMeta = {__index = {}}
 
 local iconMeta = {
     __index = {
@@ -246,13 +248,46 @@ Gui.closeInventory = function()
 
 end
 
-Gui.showInterface = function()
+Gui.createInterface = function()
     local interface = {}
     interface.group = display.newGroup()
-    interface.swiper = Gui.createSwiper()--
-    local inventoryButton = Gui.createButton{width = gh/5, height = gh/5, image = Gui.interfaceCatalog .."inventory_button"}--
-    inventoryButton.onRelease = Gui.openInventory()--
+    interface.swiper = Gui.createSwiper() --
+    local size = gh / 5
+    local inventoryButton = Gui.createButton {
+        width = size,
+        height = size,
+        image = Gui.interfaceCatalog .. "inventory_button.png"
+    } --
+    inventoryButton.onRelease = Gui.openInventory() --
+    local questsButton = Gui.createButton {
+        width = size,
+        height = size,
+        image = Gui.interfaceCatalog .. "quests_button.png"
+    } --
 
+    local reputationButton = Gui.createButton {
+        width = size,
+        height = size,
+        image = Gui.interfaceCatalog .. "reputation_button.png"
+    } --
+
+    local settingsButton = Gui.createButton {
+        width = size,
+        height = size,
+        image = Gui.interfaceCatalog .. "settings_button.png"
+    } --
+
+    local locationMenu = display.newGroup()
+
+    local locationButton = Gui.createButton {
+        width = size,
+        height = size,
+        image = Gui.interfaceCatalog .. "triangle.png"
+    } --
+    locationButton:rotate(-90)
+    locationButton.onRelease = function()
+
+    end
     return interface
 end
 
