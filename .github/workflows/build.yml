@@ -13,4 +13,4 @@ jobs:
             run: git ls-files *.lua | xargs thirdparty/LuaFormatter/bin/win32/lua-format.exe -i --verbose && git diff --exit-code
             
           - name: Build application
-            run: buiilder/CoronaBuilder.exe build --lua builder/build.android.lua
+            run: make build
