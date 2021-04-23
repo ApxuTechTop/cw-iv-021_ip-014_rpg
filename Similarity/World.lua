@@ -1,5 +1,5 @@
 local World = {settings = {minDistItemMerge = 0.05}}
-
+local Entity = require("Entity")
 local lootMeta = {
     __index = {
         setObscurity = function(self, obscurity)
@@ -73,6 +73,60 @@ local battleMeta = {
             for _, entity in pairs(self.right) do
                 entity:think()
                 entity.battleBuffer:run()
+            end
+        end
+    }
+}
+
+local spotMeta = {
+    __index = {
+        addMob = function(self, options)
+            local length = #self.mobs + 1
+            self.mobs[length].entityOptions = options.entityOptions
+            self.mobs[length].max = options.max
+            self.mobs[length].count = 0
+            self.mobs[length].weigth = options.weigth
+            self.mobs[length].time = options.time
+        end,
+        run = function(self)
+            if self.count < self.max and not self.spawned then
+                self.spawned = true
+                local weigth
+                for _, v in pairs(self.mobs) do
+                    if v.count < v.max then
+                        weigth = weigth + v.weigth
+                    end
+                end
+                weigth = math.random(weigth)
+                for _, v in ipairs(self.mobs) do
+                    if v.count < v.max then
+                        weigth = weigth - v.weigth
+                        if weigth <= 0 then
+                            timer.performWithDelay(v.time, function()
+                                createMob(v)
+                                self.spawned = nil
+                                self:run()
+                            end)
+                            return true
+                        end
+                    end
+                end
+            end
+        end,
+        createMob = function(self, mob)
+            local posx = random(math.floor(self.position.x - self.radiusX), math.floor(self.position.x + self.radiusX))
+            local posy = random(math.floor(self.position.y - self.radiusY), math.floor(self.position.y + self.radiusY))
+            mob.entityOptions.position = {loc = self.loc, x = posx, y = posy}
+            local entity = Entity.new(mob.entityOptions)
+            entity.spot = self
+            entity.position.loc:addEntity(entity)
+        end,
+        removeMob = function(self, mob)
+            for k, v in pairs(self.mobs) do
+                if v.entityOptions.name == mob.name and v.entityOptions.surname == mob.surname then
+                    v.count = v.count - 1
+                    self.count = self.count - 1
+                end
             end
         end
     }
@@ -174,7 +228,26 @@ local locationMeta = {
             end
             return battle
         end
-    }
+    },
+    newSpot = function(self, options)
+        local spot = {
+            position = {loc = options.loc or self, x = options.x, y = options.y},
+            radiusX = options.radiusX or 50,
+            radiusY = options.radiusY or 50,
+            mobs = options.mobs,
+            max = options.max,
+            count = options.count or 0
+        }
+        setmetatable(spot, spotMeta)
+        self.spots[#self.spots + 1] = spot
+    end,
+    removeSpot = function(self, spot)
+        for k, v in pairs(self.spots) do
+            if v == spot then
+                tabale.remove(self.spots, k)
+            end
+        end
+    end
 }
 
 local worldMeta = {
@@ -209,7 +282,8 @@ local worldMeta = {
                 loot = options.loot,
                 entities = options.entities,
                 battles = options.battles,
-                world = self
+                world = self,
+                spots = options.spots or {}
             }
             setmetatable(location, locationMeta)
             self.locations[location.id] = location
@@ -241,6 +315,7 @@ location = {
     loot = {{items = {item}, pos = {0.2, 0.2}, obscurity = -1}},
     battles = {battle},
     world = world,
+    spots={spot},
     graphics = {
         texture = display.object,
         info = {
@@ -275,6 +350,14 @@ battle = {
     graphics = gui.icon
 }
 
+spot ={
+    position={loc=location,x=50,y=50},
+    radiusX=25,
+    radiusY=25,
+    mobs={{entity=entity,max=10,count=2,weigth=5,time=10000}},
+    max=10,
+    count=2
+}
 function findItems()
     local l = world.locations[self.position[1]]
     for key, loot in pairs(l.loot) do

@@ -202,11 +202,13 @@ local entityMeta = {
 
         death = function(self)
             -- drop
-            print(self.name .. " умер")
+            if self.spot then
+                self.spot:removeMob(self)
+            end
             if self.position.loc.world:clear(self) then
                 return true
             else
-                assert(false, "Didn't find entiry to clear")
+                assert(false, "Didn't find entity to clear")
             end
         end,
         think = function(self)
