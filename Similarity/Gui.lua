@@ -5,6 +5,7 @@ local gw, gh = display.contentWidth, display.contentHeight
 
 local Gui = {}
 Gui.interfaceCatalog = "interface/"
+Gui.battleActionsCatalog = Gui.interfaceCatalog .. "battleActions/"
 Gui.masksCatalog = "masks/"
 
 --[=[
@@ -34,7 +35,8 @@ Gui.color = {
         stroke = {117 / 255, 59 / 255, 2 / 255},
         none = {}
     },
-    buttonBackground = {none = {}}
+    buttonBackground = {none = {0.5, 0.5, 0.5}},
+    progressBar = {none = {0.5, 0.5, 0.5}}
 }
 
 local buttonMeta = {
@@ -150,7 +152,7 @@ Gui.createButton = function(options)
         button:addEventListener("touch", button)
         button:addEventListener("tap", button)
     end
-    
+
     return button
 end
 
@@ -179,13 +181,206 @@ Gui.createIcon = function(what, name)
     return icon
 end
 
-local swiperMeta = {__index = {}}
-Gui.createSwiper = function()
+local swiperMeta = {
+    __index = {
+        add = function(self, object)
+            self:insert(object)
+            if self.isOpened then
+                object.isVisible = true
+            else
+                object.isVisible = false
+                object.x, object.y = 0, 0
+            end
+        end,
+        open = function(self)
+            self.isOpened = true
+            local dirX = self.direction == "right" and 1 or (self.direction == "left" and -1 or 0)
+            local dirY = self.direction == "down" and 1 or (self.direction == "up" and -1 or 0)
+            local x = self[1].x
+            local y = self[1].y
+            x = self.main.x + math.abs(dirX) * self.width * ((1 + dirX) / 2 - self.main.anchorX)
+            y = self.main.y + math.abs(dirY) * self.height * ((1 + dirY) / 2 - self.main.anchorY)
+            for i = 2, self.numChildren do
+                x = x + math.abs(dirX) * self[i - 1].width * ((1 + dirX) / 2 - self.main.anchorX) - dirX *
+                        self[i - 1].width * ((1 - dirX) / 2 - self[i].anchorX)
+                y = y + math.abs(dirY) * self[i - 1].height * ((1 + dirY) / 2 - self.main.anchorY) - dirY *
+                        self[i].height * ((1 - dirY) / 2 - self[i].anchorY)
+                x = x + dirX * self.indent
+                y = y + dirY * self.indent
+                self[i].isVisible = true
+                transition.to(self[i], {time = self.time, x = x, y = y, transition = easing.outSine})
+            end
+        end,
+        close = function(self)
+            self.isOpened = false
+            for i = 2, self.numChildren do
+                transition.to(self[i], {
+                    time = self.time,
+                    x = 0,
+                    y = 0,
+                    transition = easing.outSine,
+                    onComplete = function()
+                        self[i].isVisible = false
+                    end
+                })
+            end
+        end
+    }
+}
 
+Gui.createSwiper = function()
+    local swiper = display.newGroup()
+    for key, val in pairs(swiperMeta.__index) do
+        swiper[key] = val
+    end
+    return swiper
+end
+
+local listMeta = {
+    __index = {
+        add = function(self, object, index)
+            local index = index or (#self.objects + 1)
+            for i = index, #self.objects do
+                transition.to(self.objects[i], {
+                    time = self.addTime,
+                    y = self.objects[i].y + object.height + self.indent,
+                    transition = easing.outSine
+                })
+            end
+            timer.performWithDelay(self.addTime, function()
+                object.y =
+                    (self.objects[index - 1] and (self.objects[index - 1].y + self.objects[index - 1].height / 2) or 0) +
+                        self.indent + object.height / 2
+            end)
+        end,
+        remove = function(self, object)
+            local num = object
+            if type(object) ~= "number" then
+                for i = 1, #self.objects do
+                    if self.objects[i] == object then
+                        num = i
+                        break
+                    end
+                end
+            end
+        end
+    }
+}
+
+Gui.createList = function(options)
+    local list = display.newGroup()
+    list.x, list.y = options.x or 0, options.y or 0
+    if options.background then
+
+    end
+    list.indent = options.indent or gw / 50
+    list.objects = {}
+    for key, value in pairs(listMeta) do
+        list[key] = value
+    end
+    return list
 end
 
 Gui.createItemDescription = function()
 
+end
+
+local progressViewMeta = {
+    __index = {
+        setProgress = function(self, percent)
+            self.bar.scaleX = percent
+        end,
+        getProgress = function(self)
+            return self.bar.scaleX
+        end
+    }
+}
+Gui.createProgressView = function(options)
+    local progressView = display.newGroup()
+    if options.parent then
+        options.parent:insert(progressView)
+    end
+    local progressBackground
+    if options.bgShape == "rect" then
+        progressBackground = display.newRect(progressView, 0, 0, options.width, options.height)
+    elseif options.bgShape == "roundedRect" then
+        progressBackground = display.newRoundedRect(progressView, 0, 0, options.width, options.height,
+                                                    options.bgCornerRadius or options.height / 10)
+    end
+    progressBackground.anchorX, progressBackground.anchorY = options.isRight and 1 or 0, 0
+    local progressBar
+    options.barWidth = options.barWidth or options.width
+    options.barHeight = options.barHeight or options.height
+    if options.barShape == "rect" then
+        progressBar = display.newRect(progressView, 0, 0, options.width, options.height)
+    elseif options.barShape == "roundedRect" then
+        progressBar = display.newRoundedRect(progressView, 0, 0, options.barWidth, options.barHeight,
+                                             options.barCornerRadius or options.height / 10)
+    end
+    progressBar.fill = options.fill or Gui.color.progressBar
+    progressBar.anchorX, progressBar.anchorY = options.isRight and 1 or 0, 0.5
+    progressBar.x = (options.width - options.barWidth) / 2 * (options.isRight and -1 or 1)
+    progressBar.y = options.height / 2
+
+    progressView.bar = progressBar
+    progressView.bg = progressBackground
+    for key, value in pairs(progressViewMeta.__index) do
+        progressView[key] = value
+    end
+    return progressView
+end
+
+Gui.displayBattle = function(battle)
+    battle.graphics.scene = display.newGroup()
+    battle.graphics.battleActions = display.newGroup()
+    battle.graphics.scene:insert(battle.graphics.battleActions)
+    local background = display.newRect(battle.graphics.scene, 0, 0, gw, gh)
+    background.anchorX, background.anchorY = 0, 0
+    local leftBars = Gui.createList()
+    local rightBars = Gui.createList()
+    local playerSide
+    for _, k in pairs("left", "right") do
+        for _, entity in pairs(battle[k]) do
+            if entity == battle.position.loc.world.players[1] then
+                playerSide = k
+                break
+            end
+        end
+    end
+    local barWidth = gw / 4
+    local barHeight = gh / 10
+    for _, entity in pairs(battle[playerSide]) do
+        entity.graphics.hpbar = Gui.createProgressView {
+            parent = leftBars,
+            bgShape = "roundedRect",
+            barShape = "roundedRect",
+            width = barWidth,
+            height = barHeight
+        }
+    end
+    for _, entity in pairs(battle[playerSide == "left" and "right" or "left"]) do
+        entity.graphics.hpbar = Gui.createProgressView {
+            parent = rightBars,
+            bgShape = "roundedRect",
+            barShape = "roundedRect",
+            width = barWidth,
+            height = barHeight,
+            isRight = true
+        }
+    end
+end
+local battleActionSize = gh / 10
+Gui.displayBattleAction = function(battleAction)
+    local image = display.newImageRect(battleAction.me.battle.graphics.battleActions,
+                                       Gui.battleActionsCatalog .. battleAction.type .. ".png",
+                                       system.ResourceDirectory, battleActionSize, battleActionSize)
+    battleAction.graphics = image
+    image:addEventListener("tap", function()
+        battleAction:event()
+        image:removeEventListener("tap")
+        image:removeSelf()
+        battleAction.me.battleBuffer:remove(battleAction)
+    end)
 end
 
 local locationMeta = {__index = {}}
@@ -248,44 +443,154 @@ Gui.closeInventory = function()
 
 end
 
-Gui.createInterface = function()
+Gui.createInventory = function()
+    local inventory = display.newGroup()
+    inventory.background = display.newRect(inventory, 0, 0, gw, gh)
+    inventory.background.alpha = 0.6
+    inventory.background:setFillColor(0.2, 0.2, 0.2)
+    inventory.list = widget.newScrollView()
+    inventory.info = display.newGroup()
+    inventory.info.background = display.newRect(inventory.info, 0, 0, gw / 3, gh)
+    local fontSize = gw / 100
+    inventory.info.name = display.newText {
+        parent = inventory.info,
+        text = "Name",
+        font = native.systemFont,
+        fontSize = fontSize * 1.2
+    }
+    inventory.info.desc = display.newText {
+        parent = inventory.info,
+        text = "Desc",
+        font = native.systemFont,
+        fontSize = fontSize
+    }
+    inventory.info.count = display.newText {
+        parent = inventory.info,
+        text = "1",
+        font = native.systemFont,
+        fontSize = fontSize
+    }
+    inventory.info.rarity = display.newText {
+        parent = inventory.info,
+        text = "Epic",
+        font = native.systemFont,
+        fontSize = fontSize
+    }
+    inventory.info.durability = display.newText {
+        parent = inventory.info,
+        text = "Прочность: 80/80",
+        font = native.systemFont,
+        fontSize = fontSize
+    }
+    inventory.info.critChance = display.newText {
+        parent = inventory.info,
+        text = "Шанс критической атаки: 11%",
+        font = native.systemFont,
+        fontSize = fontSize
+    }
+    inventory.info.critDamage = display.newText {
+        parent = inventory.info,
+        text = "Критический урон: x1.5",
+        font = native.systemFont,
+        fontSize = fontSize
+    }
+    inventory.info.accuracy = display.newText {
+        parent = inventory.info,
+        text = "Точность оружия: 1.1",
+        font = native.systemFont,
+        fontSize = fontSize
+    }
+    inventory.info.attackSpeed = display.newText {
+        parent = inventory.info,
+        text = "Скорость атаки: 2",
+        font = native.systemFont,
+        fontSize = fontSize
+    }
+    inventory.info.damage = display.newText {
+        parent = inventory.info,
+        text = "Урон: 5",
+        font = native.systemFont,
+        fontSize = fontSize
+    }
+    inventory.info.armor = display.newText {
+        parent = inventory.info,
+        text = "Защита: 3",
+        font = native.systemFont,
+        fontSize = fontSize
+    }
+
+    return inventory
+end
+
+Gui.createInterface = function(world)
+    local player = world.players[1]
+    local location = player.position.loc
     local interface = {}
     interface.group = display.newGroup()
+    local indent = gh / 60
     interface.swiper = Gui.createSwiper() --
     local size = gh / 5
-    local inventoryButton = Gui.createButton {
+    interface.buttons = {}
+    interface.buttons.inventory = Gui.createButton {
         width = size,
         height = size,
         image = Gui.interfaceCatalog .. "inventory_button.png"
     } --
-    inventoryButton.onRelease = Gui.openInventory() --
-    local questsButton = Gui.createButton {
+    interface.buttons.inventory.onRelease = Gui.openInventory() --
+    interface.swiper:add(interface.buttons.inventory)
+    interface.buttons.quests = Gui.createButton {
         width = size,
         height = size,
         image = Gui.interfaceCatalog .. "quests_button.png"
     } --
+    interface.swiper:add(interface.buttons.quests)
 
-    local reputationButton = Gui.createButton {
+    interface.buttons.reputation = Gui.createButton {
         width = size,
         height = size,
         image = Gui.interfaceCatalog .. "reputation_button.png"
     } --
+    interface.swiper:add(interface.buttons.reputation)
 
-    local settingsButton = Gui.createButton {
+    interface.buttons.settings = Gui.createButton {
         width = size,
         height = size,
         image = Gui.interfaceCatalog .. "settings_button.png"
     } --
+    interface.swiper:add(interface.buttons.settings)
 
-    local locationMenu = display.newGroup()
+    local locationGraphics = display.newGroup()
+    locationGraphics = display.newGroup()
+    locationGraphics.x, locationGraphics.y = -gw / 2, 0
+    locationGraphics.background = display.newRect(locationGraphics, 0, 0, gw / 2, gh)
+    locationGraphics.background.anchorX, locationGraphics.background.anchorY = 0, 0
 
-    local locationButton = Gui.createButton {
+    locationGraphics.name = display.newText {
+        parent = locationGraphics,
+        x = size + indent * 2,
+        y = indent,
+        text = location.name
+    }
+    locationGraphics.desc = display.newText {
+        parent = locationGraphics,
+        x = indent,
+        y = size + 2 * indent,
+        text = location:desc()
+    }
+    locationGraphics.minimap = display.newContainer(locationGraphics, locationGraphics.background.width / 2,
+                                                    locationGraphics.background.width / 2)
+    local minimapBackground = display.newRect(locationGraphics.minimap, 0, 0, locationGraphics.background.width / 2,
+                                              locationGraphics.background.width / 2)
+    minimapBackground:setFillColor(0.5, 0.5, 0.5)
+    minimapBackground.anchorX, minimapBackground.anchorY = 0, 0
+
+    interface.buttons.location = Gui.createButton {
         width = size,
         height = size,
         image = Gui.interfaceCatalog .. "triangle.png"
     } --
-    locationButton:rotate(-90)
-    locationButton.onRelease = function()
+    interface.buttons.location:rotate(-90)
+    interface.buttons.location.onRelease = function()
 
     end
     return interface
