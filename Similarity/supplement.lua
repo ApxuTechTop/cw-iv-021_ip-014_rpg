@@ -1,3 +1,7 @@
+utf8 = require("plugin.utf8")
+
+require("ColorText")
+
 table.equal = function(tab1, tab2, stack) -- TODO
     local b = true
     local stack = stack or {}
