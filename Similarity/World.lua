@@ -82,6 +82,7 @@ local spotMeta = {
     __index = {
         addMob = function(self, options)
             local length = #self.mobs + 1
+            self.mobs[length] = {}
             self.mobs[length].entityOptions = options.entityOptions
             self.mobs[length].max = options.max
             self.mobs[length].count = 0
@@ -91,7 +92,7 @@ local spotMeta = {
         run = function(self)
             if self.count < self.max and not self.spawned then
                 self.spawned = true
-                local weigth
+                local weigth = 0
                 for _, v in pairs(self.mobs) do
                     if v.count < v.max then
                         weigth = weigth + v.weigth
@@ -103,7 +104,8 @@ local spotMeta = {
                         weigth = weigth - v.weigth
                         if weigth <= 0 then
                             timer.performWithDelay(v.time, function()
-                                createMob(v)
+                                print(v.entityOptions.name .. " " .. v.count + 1)
+                                self:createMob(v)
                                 self.spawned = nil
                                 self:run()
                             end)
@@ -114,12 +116,16 @@ local spotMeta = {
             end
         end,
         createMob = function(self, mob)
-            local posx = random(math.floor(self.position.x - self.radiusX), math.floor(self.position.x + self.radiusX))
-            local posy = random(math.floor(self.position.y - self.radiusY), math.floor(self.position.y + self.radiusY))
-            mob.entityOptions.position = {loc = self.loc, x = posx, y = posy}
+            local posx = math.random(math.floor(self.position.x - self.radiusX),
+                                     math.floor(self.position.x + self.radiusX))
+            local posy = math.random(math.floor(self.position.y - self.radiusY),
+                                     math.floor(self.position.y + self.radiusY))
+            mob.entityOptions.position = {loc = self.position.loc, x = posx, y = posy}
             local entity = Entity.new(mob.entityOptions)
             entity.spot = self
             entity.position.loc:addEntity(entity)
+            self.count = self.count + 1
+            mob.count = mob.count + 1
         end,
         removeMob = function(self, mob)
             for k, v in pairs(self.mobs) do
@@ -128,6 +134,7 @@ local spotMeta = {
                     self.count = self.count - 1
                 end
             end
+            self:run()
         end
     }
 }
@@ -137,6 +144,7 @@ local locationMeta = {
         addEntity = function(self, entity, position)
             self.entities = self.entities or {}
             entity.position = position or {loc = self, x = 0, y = 0}
+            entity.position.loc = entity.position.loc or self
             self.entities[#self.entities + 1] = entity
 
             -- ивент на отображение
@@ -227,27 +235,28 @@ local locationMeta = {
                 entity.battle = battle
             end
             return battle
-        end
-    },
-    newSpot = function(self, options)
-        local spot = {
-            position = {loc = options.loc or self, x = options.x, y = options.y},
-            radiusX = options.radiusX or 50,
-            radiusY = options.radiusY or 50,
-            mobs = options.mobs,
-            max = options.max,
-            count = options.count or 0
-        }
-        setmetatable(spot, spotMeta)
-        self.spots[#self.spots + 1] = spot
-    end,
-    removeSpot = function(self, spot)
-        for k, v in pairs(self.spots) do
-            if v == spot then
-                tabale.remove(self.spots, k)
+        end,
+        newSpot = function(self, options)
+            local spot = {
+                position = {loc = options.loc or self, x = options.x or 0, y = options.y or 0},
+                radiusX = options.radiusX or 50,
+                radiusY = options.radiusY or 50,
+                mobs = options.mobs or {},
+                max = options.max,
+                count = options.count or 0
+            }
+            setmetatable(spot, spotMeta)
+            self.spots[#self.spots + 1] = spot
+            return spot
+        end,
+        removeSpot = function(self, spot)
+            for k, v in pairs(self.spots) do
+                if v == spot then
+                    tabale.remove(self.spots, k)
+                end
             end
         end
-    end
+    }
 }
 
 local worldMeta = {
@@ -278,12 +287,14 @@ local worldMeta = {
                 name = options.name,
                 desc = options.desc,
                 texture = options.texture,
-                path = options.path,
-                loot = options.loot,
-                entities = options.entities,
-                battles = options.battles,
+                path = options.path or {},
+                loot = options.loot or {},
+                entities = options.entities or {},
+                battles = options.battles or {},
                 world = self,
-                spots = options.spots or {}
+                spots = options.spots or {},
+                width = options.width,
+                height = options.height
             }
             setmetatable(location, locationMeta)
             self.locations[location.id] = location

@@ -1,3 +1,6 @@
+local Storage = require("Storage")
+local Item = Storage.Item
+local ItemDataBase = require("ItemDataBase")
 local Entity = {}
 local battleBufferMeta
 
@@ -9,7 +12,7 @@ local battleActionMeta = {
             elseif self.type == "defense" then -- mbmb miss
                 local maxBlockItem
                 for k, item in pairs(self.me.equipment.hands) do
-                    if item.tags[3] == "Shield" then
+                    if item.tags:find("Shield") then
                         maxBlockItem = maxBlockItem and ((item.block < maxBlockItem.block) and maxBlockItem) or item
                     else
                         maxBlockItem = maxBlockItem and (((item.block) < maxBlockItem.block) and maxBlockItem) or item
@@ -231,6 +234,38 @@ local entityMeta = {
                     end
                 end
             end
+        end,
+        equip = function(self, item, tag)
+            self:unequip(tag)
+            if type(tag) == number then
+                if self.equipment.hands[1].id == "hand" then
+                    self.equipment.hands[1] = nil
+                end
+                self.equipment.hands[tag] = item
+            else
+                self.equipment[tag] = item
+            end
+        end,
+        unequip = function(self, tag)
+            if type(tag) == "number" then
+                if not self.equipment.hands[tag] then
+                    return
+                end
+                if self.equipment.hands[tag].id == "hand" then
+                    return
+                end
+                -- self.inventory:addItem(self.equipment.hands[tag])
+                self.equipment.hands[tag] = nil
+                if #self.equipment.hands == 0 then
+                    self.equipment.hands[1] = Item.new({id = "hand"})
+                end
+            else
+                if not self.equipment[tag] then
+                    return
+                end
+                -- self.inventory:addItem(self.equipment[tag])
+                self.equipment[tag] = nil
+            end
         end
     }
 }
@@ -251,21 +286,34 @@ Entity.new = function(options)
         hunger = options.hunger,
         thirst = options.thirst,
         fatigue = options.fatigue,
-        strength = options.strength,
-        agility = options.agility,
-        dexterity = options.dexterity,
-        luck = options.luck,
-        vitality = options.vitality,
+        strength = options.strength or 1,
+        agility = options.agility or 1,
+        dexterity = options.dexterity or 1,
+        luck = options.luck or 1,
+        vitality = options.vitality or 1,
         attentiveness = options.attentiveness,
         reaction = options.reaction or 350, --
         relationship = options.relationship, --
-        inventory = options.inventory, --
-        equipment = options.equipment, --
+        inventory = Storage.new(), --
+        equipment = {hands = {}}, --
         position = options.position, --
         battleBuffer = options.battleBuffer or {}
     }
     setmetatable(entity.battleBuffer, battleBufferMeta)
     setmetatable(entity, entityMeta)
+    entity.equipment.hands[1] = Item.new({id = "hand"})
+    for k, v in pairs(options.equipment) do
+        if k == "hands" then
+            for key, value in pairs(v) do
+                local weapon = Item.new(value)
+                entity:equip(weapon, key)
+            end
+        else
+            local item = Item.new(v)
+            entity:equip(item, k)
+        end
+    end
+
     return entity
 end
 
@@ -290,7 +338,6 @@ return Entity
             hunger = 0,
             thirst = 0,
             fatigue = 0,
-
             strength = 1,
             agility = 1,
             dexterity = 1,
