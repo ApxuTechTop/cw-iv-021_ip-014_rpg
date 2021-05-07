@@ -1,3 +1,5 @@
+local Gui = require("Gui")
+
 local World = {settings = {minDistItemMerge = 0.05}}
 local Entity = require("Entity")
 local lootMeta = {
@@ -33,7 +35,28 @@ local battleMeta = {
             end
             self[key][#self[key] + 1] = entity
             entity.battle = self
-            -- ивент на отображение
+            if entity == self.position.loc.world.players[1] then
+                Gui.displayBattle(self)
+            else
+                entity:think()
+                entity.battleBuffer:run()
+                if self.graphics and self.graphics.scene then
+                    local barWidth = Gui.settings.sizes.battle.barWidth
+                    local barHeight = Gui.settings.sizes.battle.barHeight
+                    entity.graphics = entity.graphics or {}
+                    entity.graphics.hpbar = Gui.createProgressView {
+                        bgShape = "roundedRect",
+                        barShape = "roundedRect",
+                        width = barWidth,
+                        height = barHeight,
+                        fill = {1, 0, 0},
+                        isRight = self.graphics.scene[key] == "rightBars" and true
+                    }
+                    self.graphics.scene[self.graphics.scene[key]]:add(entity.graphics.hpbar)
+                end
+            end
+            entity:think()
+            entity.battleBuffer:run()
         end,
         removeEntity = function(self, entity, key)
             if key and key ~= "right" and key ~= "left" then
@@ -59,6 +82,10 @@ local battleMeta = {
                         local enemySide = (key == "left") and "right" or "left"
                         for i = #self[enemySide], 1, -1 do
                             self:removeEntity(i, enemySide)
+                        end
+                        if self.graphics then
+                            self.graphics.scene:removeSelf()
+                            self.graphics.icon:removeSelf()
                         end
                     end
                     return true
@@ -293,8 +320,8 @@ local worldMeta = {
                 battles = options.battles or {},
                 world = self,
                 spots = options.spots or {},
-                width = options.width,
-                height = options.height
+                width = options.width or 2000,
+                height = options.height or 1000
             }
             setmetatable(location, locationMeta)
             self.locations[location.id] = location

@@ -1,5 +1,7 @@
 require("supplement")
 local ItemDataBase = require("ItemDataBase")
+local Gui = require("Gui")
+local gw, gh = display.contentWidth, display.contentHeight
 local Storage = {}
 local Item = {}
 
@@ -92,12 +94,45 @@ local storageMeta = {
 
         createSlot = function(self, item, count)
             local count = count or 1
-            local size = #self.slots + 1
-            print(size)
-            print(self.countmax)
-            if size <= self.countmax then
-                self.slots[size] = {count = count, item = item} -- TODO update interface
-                setmetatable(self.slots[size], slotMeta)
+            if #self.slots < self.countmax then
+                local index = #self.slots + 1
+                self.slots[index] = {count = count, item = item, graphics = {}} -- TODO update interface
+                setmetatable(self.slots[index], slotMeta)
+                if self.graphics then
+                    local slotGraphics = self.slots[index].graphics
+                    local indent = gw / 100
+                    local width = gw / 3 - 2 * indent
+                    slotGraphics.button = Gui.createButton {
+                        width = width,
+                        fill = {0.5, 0.3, 0.3},
+                        height = gh / 10,
+                        shape = "roundedRect",
+                        cornerRadius = Gui.settings.sizes.slotButtonCornerRadius,
+                        disableTouch = true,
+                        onTap = function()
+                            Gui.inventory.info.isVisible = true
+                            Gui.updateItemInfo(item)
+                        end
+                    }
+                    slotGraphics.name = display.newText {
+                        parent = slotGraphics.button,
+                        x = indent - width / 2,
+                        text = item.name,
+                        fontSize = gh / 15
+                    }
+                    slotGraphics.name.fill = {0, 0, 0}
+                    slotGraphics.name.anchorX = 0
+                    slotGraphics.count = display.newText {
+                        parent = slotGraphics.button,
+                        x = width / 2 - indent,
+                        text = "x" .. count,
+                        fontSize = gh / 15
+                    }
+                    slotGraphics.count.fill = {0, 0, 0}
+                    slotGraphics.count.anchorX = 1
+                    self.graphics.list:add(slotGraphics.button)
+                end
+
                 return true
             end
             return false

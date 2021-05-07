@@ -1,6 +1,8 @@
 local Storage = require("Storage")
 local Item = Storage.Item
 local ItemDataBase = require("ItemDataBase")
+local Gui = require("Gui")
+
 local Entity = {}
 local battleBufferMeta
 
@@ -26,10 +28,6 @@ local battleActionMeta = {
             else -- TODO
 
             end
-            if self.another.timer then
-                print("timer работает")
-                timer.cancel(self.another.timer)
-            end
             self.enemy.battleBuffer:remove(self.another)
             self.me.battleBuffer:remove(self)
 
@@ -49,10 +47,21 @@ battleBufferMeta = {
             self[last].item = item
             self[last].event = event
             setmetatable(self[last], battleActionMeta)
-            self:run()
+            if me == me.position.loc.world.players[1] then
+                Gui.displayBattleAction(self[last])
+            else
+                self:run()
+            end
+
             return self[last]
         end, -- TODO interface
         remove = function(self, battleAction)
+            if battleAction.timer then
+                timer.cancel(battleAction.timer)
+            end
+            if battleAction.graphics then
+                battleAction.graphics:removeSelf()
+            end
             for k, v in pairs(self) do
                 if v == battleAction then
                     return table.remove(self, k)
@@ -78,7 +87,7 @@ battleBufferMeta = {
 
 local entityMeta = {
     __index = {
-        moveSpeed = 50,
+        moveSpeed = 500,
 
         setLevel = function(self, level)
             self.level = level
@@ -123,6 +132,9 @@ local entityMeta = {
 
         setHealth = function(self, health)
             self.health = health
+            if self.graphics and self.graphics.hpbar then
+                self.graphics.hpbar:setProgress((health > 0 and health or 0) / self.healthmax)
+            end
         end,
 
         setHealthmax = function(self, healthmax)
@@ -167,17 +179,26 @@ local entityMeta = {
 
         move = function(self, position)
             local distance = math.distance(self.position, position)
-            local steps = distance / self.moveSpeed
+            local steps = math.ceil(distance / 100)
             local moveSpeedX = (position.x - self.position.x) / steps
             local moveSpeedY = (position.y - self.position.y) / steps
-            timer.performWithDelay(500, function()
+            self.transitions = self.transitions or {}
+            if self.transitions.move then
+                transition.cancel(self.transitions.move)
+            end
+            self.timers = self.timers or {}
+            if self.timers.move then
+                timer.cancel(self.timers.move)
+            end
+            self.transitions.move = transition.to(self.graphics.icon, {
+                x = position.x,
+                y = position.y,
+                time = distance / self.moveSpeed * 1000
+            })
+            self.timers.move = timer.performWithDelay(distance / self.moveSpeed * 1000 / steps, function(event)
                 self.position.x = self.position.x + moveSpeedX
                 self.position.y = self.position.y + moveSpeedY
             end, steps)
-            timer.performWithDelay(500 * steps, function()
-                self.position.x = position.x
-                self.position.y = position.y
-            end)
         end,
 
         getDamage = function(self, damage) -- TODO interface
@@ -188,7 +209,7 @@ local entityMeta = {
                 end
             end
             local totalDamage = (damage - armor) / (self.vitality or 1)
-            self.health = self.health - ((totalDamage > 0.5) and totalDamage or 0.5) -- balance
+            self:setHealth(self.health - ((totalDamage > 0.5) and totalDamage or 0.5))
             for k, v in pairs(self.equipment) do
                 if k ~= "hands" then
                     if v:getHarm(damage * v.armor / armor) then
@@ -208,6 +229,13 @@ local entityMeta = {
             if self.spot then
                 self.spot:removeMob(self)
             end
+            if self.graphics then
+                if self.graphics.hpbar then
+                    self.graphics.hpbar:removeSelf()
+                end
+            end
+
+            print(self.name .. " умер")
             if self.position.loc.world:clear(self) then
                 return true
             else
@@ -224,13 +252,14 @@ local entityMeta = {
                     end
                 end
                 enemySide = enemySide or "left"
-
-                local enemyNum = math.random(#self.battle[enemySide])
-                for key, weapon in pairs(self.equipment.hands) do
-                    if weapon.tags:find("Broken") then
-                        self.equipment.hands[key] = nil
-                    else
-                        weapon:tryAttack(self, self.battle[enemySide][enemyNum])
+                if #self.battle[enemySide] > 0 then
+                    local enemyNum = math.random(#self.battle[enemySide])
+                    for key, weapon in pairs(self.equipment.hands) do
+                        if weapon.tags:find("Broken") then
+                            self.equipment.hands[key] = nil
+                        else
+                            weapon:tryAttack(self, self.battle[enemySide][enemyNum])
+                        end
                     end
                 end
             end
