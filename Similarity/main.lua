@@ -1,13 +1,31 @@
+local systemFonts = native.getFontNames()
+
+-- Set the string to query for (part of the font name to locate)
+local searchString = "pt"
+
+-- Display each font in the Terminal/console
+for i, fontName in ipairs(systemFonts) do
+
+    local j, k = string.find(string.lower(fontName), string.lower(searchString))
+
+    if (j ~= nil) then
+        print("Font Name = " .. tostring(fontName))
+    end
+end
+
 local Gui = require("Gui")
 local json = require("json")
 local widget = require("widget")
+local World = require("World")
+local Entity = require("Entity")
+local Storage = require("Storage")
+local Item = Storage.Item
 
 local cx, cy = display.contentCenterX, display.contentCenterY
 local gw, gh = display.contentWidth, display.contentHeight
 
 system.tapDelay = 350
 
-display.setDefault("background", 245 / 255, 245 / 255, 220 / 255);
 
 local game = {settings = {music = true, sounds = true}}
 
@@ -32,8 +50,95 @@ end
 
 local function startGame(self)
     self.isVisible = false
-    --
+    local world = World.new()
+    local testLocation = world:newLocation({
+        id = "test_location",
+        name = "Test location",
+        desc = function(self)
+            return ("Its test location "):rep(5)
+        end,
+        entities = {},
+        path = {},
+        battles = {},
+        height = 720 * 5,
+        width = 1520 * 10
+    })
+    testLocation.world = world
 
+    local stick = {
+        name = "stick",
+        desc = "a fragile stick",
+        tags = {"Equipment", "Weapon", "Sword"},
+        rarity = "Common",
+        damage = 1,
+        critDamage = 4,
+        accuracy = 1.2,
+        cooldown = 1000,
+        durability = 100
+    }
+
+    local ApxuTechTop = Entity.new({
+        name = "ApxuTechTop",
+        level = 5,
+        exp = 0,
+        expmax = 100,
+        reaction = 350,
+        energy = 10,
+        energymax = 10,
+        health = 100,
+        healthmax = 100,
+        strength = 3,
+        agility = 3,
+        dexterity = 3,
+        luck = 3,
+        equipment = {hands = {}},
+        inventory = Storage.new(10),
+        position = {loc = testLocation, x = 600, y = 350}
+    })
+
+    local Avili0 = Entity.new({
+        name = "Avili0",
+        level = 5,
+        exp = 0,
+        expmax = 100,
+        reaction = 1200,
+        energy = 10,
+        energymax = 10,
+        health = 20,
+        healthmax = 100,
+        strength = 3,
+        agility = 3,
+        dexterity = 3,
+        luck = 3,
+        equipment = {hands = {}},
+        position = {loc = testLocation, x = 600, y = 350}
+    })
+
+    testLocation:addEntity(ApxuTechTop, ApxuTechTop.position)
+    testLocation:addEntity(Avili0, Avili0.position)
+    world.players = {ApxuTechTop}
+    ApxuTechTop.equipment.hands[1] = Item.new(stick)
+    Avili0.equipment.hands[1] = Item.new(stick)
+    -- testLocation:addEntity(ApxuTechTopHelper)
+    local beatingUp = testLocation:newBattle({right = {Avili0}, left = {}, position = {x = 50, y = 50}})
+    -- for i=1,5 do
+    -- testLocation:addEntity(eTabl[i])
+    -- beatingUp:addEntity(eTabl[i],"right")
+    -- end
+    
+    
+    --
+    Gui.displayWorld(world)
+    
+    Gui.createInterface(world)
+    --beatingUp:addEntity(ApxuTechTop, "left")
+    --beatingUp:addEntity(Avili0, "right")
+    --beatingUp:run()
+    Gui.createInventory(world)
+    for i = 1, 13 do
+        ApxuTechTop.inventory:createSlot(Item.new(stick), 1)
+    end
+    
 end
 menu[2].onRelease = startGame
 
