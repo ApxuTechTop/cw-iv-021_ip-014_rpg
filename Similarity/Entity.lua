@@ -285,7 +285,7 @@ local entityMeta = {
                 end
                 if self.equipment.hands[tag].id == "hand" then
                     self.equipment.hands[1] = nil
-                    self.equipment.hands[2] = nil 
+                    self.equipment.hands[2] = nil
                     return
                 end
                 self.inventory:addItem(self.equipment.hands[tag])
@@ -309,6 +309,7 @@ Entity.new = function(options)
     local entity = {
         name = options.name, --
         surname = options.surname, --
+        icon = options.icon,
         level = options.level,
         exp = options.exp,
         expmax = options.expmax,
