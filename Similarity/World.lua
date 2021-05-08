@@ -52,6 +52,7 @@ local battleMeta = {
                         fill = {1, 0, 0},
                         isRight = self.graphics.scene[key] == "rightBars" and true
                     }
+                    entity.graphics.hpbar:setProgress(entity.health / entity.healthmax)
                     self.graphics.scene[self.graphics.scene[key]]:add(entity.graphics.hpbar)
                 end
             end
@@ -190,7 +191,10 @@ local locationMeta = {
         end,
         addBattle = function(self, battle)
             self.battles[#self.battles + 1] = battle
-            -- ивент на отображение
+            if self == self.world.players[1].position.loc then
+                self.graphics = self.graphics or {}
+                self.graphics.group:insert(Gui.displayBattleIcon(battle))
+            end
         end,
         removeBattle = function(self, battle)
             if type(battle) == "table" then
@@ -248,30 +252,33 @@ local locationMeta = {
         newBattle = function(self, options)
             local battle = {
                 position = options.position or {loc = self, x = 50, y = 50},
-                left = options.left,
-                right = options.right
+                left = options.left or {},
+                right = options.right or {}
             }
             battle.position.loc = battle.position.loc or self
             setmetatable(battle, battleMeta)
-            self.battles = self.battles or {}
-            self.battles[#self.battles + 1] = battle
+            self:addBattle(battle)
             for _, entity in pairs(battle.left) do
-                entity.battle = battle
+                battle:addEntity(entity, "left")
             end
             for _, entity in pairs(battle.right) do
-                entity.battle = battle
+                battle:addEntity(entity, "right")
             end
             return battle
         end,
         newSpot = function(self, options)
+            local pos = options.position
+            pos.loc = pos.loc or self
+            pos.x, pos.y = pos.x or 0, pos.y or 0
             local spot = {
-                position = {loc = options.loc or self, x = options.x or 0, y = options.y or 0},
+                position = options.position,
                 radiusX = options.radiusX or 50,
                 radiusY = options.radiusY or 50,
                 mobs = options.mobs or {},
                 max = options.max,
                 count = options.count or 0
             }
+
             setmetatable(spot, spotMeta)
             self.spots[#self.spots + 1] = spot
             return spot
