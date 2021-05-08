@@ -59,7 +59,7 @@ battleBufferMeta = {
             if battleAction.timer then
                 timer.cancel(battleAction.timer)
             end
-            if battleAction.graphics then
+            if battleAction.graphics and battleAction.graphics.removeSelf then
                 battleAction.graphics:removeSelf()
             end
             for k, v in pairs(self) do
@@ -177,7 +177,7 @@ local entityMeta = {
             self.attentiveness = attentiveness
         end,
 
-        move = function(self, position)
+        move = function(self, position, foo)
             local distance = math.distance(self.position, position)
             local steps = math.ceil(distance / 100)
             local moveSpeedX = (position.x - self.position.x) / steps
@@ -198,6 +198,9 @@ local entityMeta = {
             self.timers.move = timer.performWithDelay(distance / self.moveSpeed * 1000 / steps, function(event)
                 self.position.x = self.position.x + moveSpeedX
                 self.position.y = self.position.y + moveSpeedY
+                if event.count == steps and foo then
+                    foo()
+                end
             end, steps)
         end,
 
@@ -233,6 +236,9 @@ local entityMeta = {
                 if self.graphics.hpbar then
                     self.graphics.hpbar:removeSelf()
                 end
+                if self.graphics.icon then
+                    self.graphics.icon:removeSelf()
+                end
             end
 
             print(self.name .. " умер")
@@ -266,10 +272,7 @@ local entityMeta = {
         end,
         equip = function(self, item, tag)
             self:unequip(tag)
-            if type(tag) == number then
-                if self.equipment.hands[1].id == "hand" then
-                    self.equipment.hands[1] = nil
-                end
+            if type(tag) == "number" then
                 self.equipment.hands[tag] = item
             else
                 self.equipment[tag] = item
@@ -281,18 +284,21 @@ local entityMeta = {
                     return
                 end
                 if self.equipment.hands[tag].id == "hand" then
+                    self.equipment.hands[1] = nil
+                    self.equipment.hands[2] = nil 
                     return
                 end
-                -- self.inventory:addItem(self.equipment.hands[tag])
+                self.inventory:addItem(self.equipment.hands[tag])
                 self.equipment.hands[tag] = nil
-                if #self.equipment.hands == 0 then
+                if not (self.equipment.hands[1] or self.equipment.hands[2]) then
                     self.equipment.hands[1] = Item.new({id = "hand"})
+                    self.equipment.hands[2] = Item.new({id = "hand"})
                 end
             else
                 if not self.equipment[tag] then
                     return
                 end
-                -- self.inventory:addItem(self.equipment[tag])
+                self.inventory:addItem(self.equipment[tag])
                 self.equipment[tag] = nil
             end
         end
@@ -325,12 +331,13 @@ Entity.new = function(options)
         relationship = options.relationship, --
         inventory = Storage.new(), --
         equipment = {hands = {}}, --
-        position = options.position, --
+        position = options.position or {}, --
         battleBuffer = options.battleBuffer or {}
     }
     setmetatable(entity.battleBuffer, battleBufferMeta)
     setmetatable(entity, entityMeta)
     entity.equipment.hands[1] = Item.new({id = "hand"})
+    entity.equipment.hands[2] = Item.new({id = "hand"})
     for k, v in pairs(options.equipment) do
         if k == "hands" then
             for key, value in pairs(v) do
@@ -342,7 +349,10 @@ Entity.new = function(options)
             entity:equip(item, k)
         end
     end
-
+    local location = entity.position.loc
+    if location.graphics and location.graphics.group then
+        location.graphics.group:insert(Gui.displayEntity(entity))
+    end
     return entity
 end
 
