@@ -27,7 +27,6 @@ local gw, gh = display.contentWidth, display.contentHeight
 
 system.tapDelay = 350
 
-
 local game = {settings = {music = true, sounds = true}}
 
 local menu = display.newGroup()
@@ -50,6 +49,68 @@ for key, val in pairs({
 end
 
 local function startGame(self)
+    local swordOption = {
+        name = "Iron sword",
+        desc = "Обычный ржавый меч",
+        tags = {"Common", "Equipment", "Weapon", "Sword"},
+        damage = 3,
+        critDamage = 1.5,
+        accuracy = 1.2,
+        cooldown = 1500,
+        durability = 15
+    }
+
+    local goblinRogueOptions = {
+        name = "Гоблин-разбойник",
+        lvl = 3,
+        exp = 0,
+        expmax = 100,
+        energy = 10,
+        mana = 0,
+        manamax = 0,
+        health = 15,
+        healthmax = 15,
+        strength = 2,
+        agility = 2,
+        dexterity = 2,
+        luck = 2,
+        vitality = 2,
+        reaction = 500,
+        equipment = {hands = {swordOption}}
+    }
+
+    local spearOptions = {
+        name = "short spear",
+        desk = "Немного заурядное короткое копье",
+        tags = {"Equipment", "Weapon", "Spear"},
+        rarity = "Common",
+        damage = 5,
+        critDamage = 1,
+        5,
+        accuracy = 0.9,
+        cooldown = 2500,
+        durability = 15
+    }
+    local goblinSpearmanOptions = {
+        name = "Гоблин-Копейщик",
+        lvl = 3,
+        exp = 0,
+        expmax = 100,
+        energy = 10,
+        mana = 0,
+        manamax = 0,
+        health = 20,
+        healthmax = 15,
+        strength = 3,
+        agility = 1,
+        5,
+        dexterity = 1,
+        5,
+        luck = 2,
+        vitality = 2,
+        reaction = 550,
+        equipment = {hands = {spearOptions}}
+    }
     self.isVisible = false
     local world = World.new()
     local testLocation = world:newLocation({
@@ -69,8 +130,7 @@ local function startGame(self)
     local stick = {
         name = "stick",
         desc = "a fragile stick",
-        tags = {"Equipment", "Weapon", "Sword"},
-        rarity = "Common",
+        tags = {"Common", "Equipment", "Weapon", "Sword"},
         damage = 1,
         critDamage = 4,
         accuracy = 1.2,
@@ -96,6 +156,23 @@ local function startGame(self)
         inventory = Storage.new(10),
         position = {loc = testLocation, x = 600, y = 350}
     })
+    local ApxuTechTopHelper = Entity.new({
+        name = "ApxuTechTopHelper",
+        level = 5,
+        exp = 0,
+        expmax = 100,
+        reaction = 350,
+        energy = 10,
+        energymax = 10,
+        health = 100,
+        healthmax = 100,
+        strength = 1,
+        agility = 3,
+        dexterity = 3,
+        luck = 3,
+        position = {loc = testLocation, x = 600, y = 350},
+        equipment = {hands = {stick}}
+    })
 
     local Avili0 = Entity.new({
         name = "Avili0",
@@ -117,29 +194,36 @@ local function startGame(self)
 
     testLocation:addEntity(ApxuTechTop, ApxuTechTop.position)
     testLocation:addEntity(Avili0, Avili0.position)
+    testLocation:addEntity(ApxuTechTopHelper, ApxuTechTopHelper.position)
     world.players = {ApxuTechTop}
-    ApxuTechTop.equipment.hands[1] = Item.new(stick)
-    Avili0.equipment.hands[1] = Item.new(stick)
-    -- testLocation:addEntity(ApxuTechTopHelper)
-    local beatingUp = testLocation:newBattle({right = {Avili0}, left = {}, position = {x = 50, y = 50}})
+
+    ApxuTechTop:equip(Item.new(stick), 1)
+    Avili0:equip(Item.new(stick), 1)
+    Gui.displayWorld(world)
+    local beatingUp = testLocation:newBattle({right = {}, left = {}, position = {x = 50, y = 50}})
     -- for i=1,5 do
     -- testLocation:addEntity(eTabl[i])
     -- beatingUp:addEntity(eTabl[i],"right")
     -- end
-    
-    
-    --
-    Gui.displayWorld(world)
-    
+    local goblinSpot = testLocation:newSpot({position = {x = 1000, y = 1000}, radiusX = 500, radiusY = 500, max = 5})
+
+    local goblinSpearmanSpotOptions = {entityOptions = goblinSpearmanOptions, max = 2, weigth = 10, time = 1500}
+
+    local goblinRogueSpotOptions = {entityOptions = goblinRogueOptions, max = 10, weigth = 4, time = 1000}
+
+    goblinSpot:addMob(goblinRogueSpotOptions)
+    goblinSpot:addMob(goblinSpearmanSpotOptions)
+    goblinSpot:run()
     Gui.createInterface(world)
-    --beatingUp:addEntity(ApxuTechTop, "left")
-    --beatingUp:addEntity(Avili0, "right")
-    --beatingUp:run()
+    beatingUp:addEntity(ApxuTechTop, "left")
+    beatingUp:addEntity(ApxuTechTopHelper, "left")
+    beatingUp:addEntity(Avili0, "right")
+    beatingUp:run()
     Gui.createInventory(world)
     for i = 1, 13 do
         ApxuTechTop.inventory:createSlot(Item.new(stick), 1)
     end
-    
+
 end
 menu[2].onRelease = startGame
 
@@ -280,23 +364,6 @@ end
 --     equipment = {hands = {sword_1, stick}}
 -- })
 
--- -- local ApxuTechTopHelper = Entity.new({
--- --     name = "ApxuTechTopHelper",
--- --     level = 5,
--- --     exp = 0,
--- --     expmax = 100,
--- --     reaction=350,
--- --     energy = 10,
--- --     energymax = 10,
--- --     health = 100,
--- --     healthmax = 100,
--- --     strength = 1,
--- --     agility = 3,
--- --     dexterity = 3,
--- --     luck = 3,
--- --     equipment = {hands = {stick}}
--- -- }
-
 -- local world = World.new()
 -- local testLocation = world:newLocation({
 --     id = "test_location",
@@ -315,93 +382,3 @@ end
 -- -- beatingUp:addEntity(eTabl[i],"right")
 -- -- end
 -- beatingUp:run()
-local swordOption = {
-    name = "Iron sword",
-    desc = "Обычный ржавый меч",
-    tags = {"Common", "Equipment", "Weapon", "Sword"},
-    damage = 3,
-    critDamage = 1.5,
-    accuracy = 1.2,
-    cooldown = 1500,
-    durability = 15
-}
-
-local goblinRogueOptions = {
-    name = "Гоблин-разбойник",
-    lvl = 3,
-    exp = 0,
-    expmax = 100,
-    energy = 10,
-    mana = 0,
-    manamax = 0,
-    health = 15,
-    hralthmax = 15,
-    strength = 2,
-    agility = 2,
-    dexterity = 2,
-    luck = 2,
-    vitality = 2,
-    reaction = 500,
-    equipment = {hands = {swordOption}}
-}
-
-local spearOptions = {
-    name = "short spear",
-    desk = "Немного заурядное короткое копье",
-    tags = {"Equipment", "Weapon", "Spear"},
-    rarity = "Common",
-    damage = 5,
-    critDamage = 1,
-    5,
-    accuracy = 0.9,
-    cooldown = 2500,
-    durability = 15
-}
-local goblinSpearmanOptions = {
-    name = "Гоблин-Копейщик",
-    lvl = 3,
-    exp = 0,
-    expmax = 100,
-    energy = 10,
-    mana = 0,
-    manamax = 0,
-    health = 20,
-    hralthmax = 15,
-    strength = 3,
-    agility = 1,
-    5,
-    dexterity = 1,
-    5,
-    luck = 2,
-    vitality = 2,
-    reaction = 550,
-    equipment = {hands = {spearOptions}}
-}
-
-local world = World.new()
-local testLocation = world:newLocation({
-    id = "test_location",
-    name = "Test location",
-    desc = "Small location",
-    height = 720 * 3,
-    width = 1520 * 3,
-
-})
-
-local goblinSpot = testLocation:newSpot({position = {x = 50, y = 50}, radiusX = 20, radiusY = 20, max = 5})
-
-local goblinSpearmanSpotOptions = {entityOptions = goblinSpearmanOptions, max = 2, weigth = 10, time = 1500}
-
-local goblinRogueSpotOptions = {entityOptions = goblinRogueOptions, max = 10, weigth = 4, time = 1000}
-
-goblinSpot:addMob(goblinRogueSpotOptions)
-goblinSpot:addMob(goblinSpearmanSpotOptions)
-goblinSpot:run()
-timer.performWithDelay(3000, function()
-    for k, v in pairs(testLocation.entities) do
-        if v.name == "Гоблин-разбойник" then
-            print(json.prettify(v.equipment.hands))
-            break
-        end
-    end
-end, 19)
