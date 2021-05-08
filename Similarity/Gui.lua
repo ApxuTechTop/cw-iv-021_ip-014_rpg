@@ -33,6 +33,16 @@ Gui.settings = {
 }
 Gui.settings.catalogs.battleActionsImages = Gui.settings.catalogs.interface .. "battleActions/"
 Gui.settings.catalogs.equipment = Gui.settings.catalogs.interface .. "equipment/"
+Gui.settings.catalogs.icons = Gui.settings.catalogs.interface .. "icons/"
+do
+    local ic = Gui.settings.catalogs.icons
+    Gui.settings.icons = {
+        entityIcon = ic .. "entityIcon.png",
+        battleIcon = ic .. "battleIcon.png",
+        goblinIcon = ic .. "goblinIcon.png",
+        noneIcon = ic .. "noneIcon.png"
+    }
+end
 do
     local edir = Gui.settings.catalogs.equipment
     Gui.settings.images = {
@@ -224,10 +234,10 @@ end
 
 Gui.default = {
     iconImage = { -- make images
-        path = "Icon.png",
-        entity = "Icon.png",
-        battle = "Icon.png",
-        none = "Icon.png"
+        path = "interface/personIcon.png",
+        entity = "interface/personIcon.png",
+        battle = "interface/battleIcon.png",
+        none = "interface/personIcon.png"
     }
 }
 
@@ -511,7 +521,7 @@ end
 
 Gui.createIcon = function(what, name)
     local what = what or "none"
-    local name = name or Gui.default.iconImage[what]
+    local name = name or Gui.settings.icons[what .. "Icon"]
     local icon = display.newGroup()
     local size = Gui.settings.sizes.icon
     icon.frame = display.newCircle(icon, 0, 0, Gui.settings.sizes.iconFrameWidth)
@@ -627,12 +637,13 @@ local iconMeta = {
 
 Gui.displayBattleIcon = function(battle)
     battle.graphics = {icon = Gui.createIcon("battle")}
-    battle.graphics.icon:translate(battle.position.x, battle.position.y)
+    battle.graphics.icon.x = battle.position.x
+    battle.graphics.icon.y = battle.position.y
     return battle.graphics.icon
 end
 
 Gui.displayEntity = function(entity)
-    local icon = Gui.createIcon("entity")
+    local icon = Gui.createIcon("entity", entity.icon)
     entity.graphics = {icon = icon}
     icon:translate(entity.position.x, entity.position.y)
     icon.text = display.newText {
@@ -655,7 +666,7 @@ Gui.displayEntity = function(entity)
                 }
                 battle:addEntity(player, "left")
                 battle:addEntity(entity, "right")
-                
+
                 battle:run()
             end)
         end
@@ -753,8 +764,8 @@ Gui.updateItemInfo = function(item)
     info.rarity.anchorX = 0
     info.rarity.anchorY = 0
     info.list:add(info.rarity, num)
-    --info.list:hide(info.desc)
-    --info.list:show(info.desc)
+    -- info.list:hide(info.desc)
+    -- info.list:show(info.desc)
     info.durability.text = "Прочность: " .. item.durability ..
                                (rawget(item, "durabilitymax") and "/" .. item.durabilitymax or "")
 end
