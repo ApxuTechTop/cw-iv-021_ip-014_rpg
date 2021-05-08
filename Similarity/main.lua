@@ -62,6 +62,7 @@ local function startGame(self)
 
     local goblinRogueOptions = {
         name = "Гоблин-разбойник",
+        icon = Gui.settings.icons.goblinIcon,
         lvl = 3,
         exp = 0,
         expmax = 100,
@@ -93,6 +94,7 @@ local function startGame(self)
     }
     local goblinSpearmanOptions = {
         name = "Гоблин-Копейщик",
+        icon = Gui.settings.icons.goblinIcon,
         lvl = 3,
         exp = 0,
         expmax = 100,
