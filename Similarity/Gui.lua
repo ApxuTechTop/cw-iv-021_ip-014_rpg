@@ -49,8 +49,11 @@ do
         equipment = {
             head = edir .. "helmet.png",
             chest = edir .. "chestplate.png",
+            bracers = edir .. "bracers.png",
             legs = edir .. "pants.png",
-            foots = edir .. "boots.png"
+            foots = edir .. "boots.png",
+            hands1 = edir .. "hands1.png",
+            hands2 = edir .. "hands2.png"
         }
     }
 end
@@ -340,17 +343,17 @@ local listMeta = {
         end,
         remove = function(self, object)
             local num = self:find(object)
+            self:hide(num)
             local height = self.objects[num].height + self.indent
             display.getCurrentStage():insert(self.objects[num])
             table.remove(self.objects, num)
-            for i = num, #self.objects do
-                transition.to(self.objects[i],
-                              {time = self.time, y = self.objects[i].y - height, transition = easing.outSine})
-            end
             return num
         end,
         hide = function(self, object)
             local num = self:find(object)
+            if self.objects[num].isVisible == false then
+                return num
+            end
             self.objects[num].isVisible = false
             local height = self.objects[num].height + self.indent
             for i = num + 1, #self.objects do
@@ -361,6 +364,9 @@ local listMeta = {
         end,
         show = function(self, object)
             local num = self:find(object)
+            if self.objects[num].isVisible == true then
+                return num
+            end
             self.objects[num].isVisible = true
             local height = self.objects[num].height + self.indent
             for i = num + 1, #self.objects do
@@ -368,6 +374,16 @@ local listMeta = {
                               {time = self.time, y = self.objects[i].y + height, transition = easing.outSine})
             end
             return num
+        end,
+        hideAll = function(self)
+            for i = 1, #self.objects do
+                self:hide(i)
+            end
+        end,
+        showAll = function(self)
+            for i = 1, #self.objects do
+                self:show(i)
+            end
         end
     }
 }
@@ -747,8 +763,16 @@ end
 
 Gui.updateItemInfo = function(item)
     local info = Gui.inventory.info
+    if not item then
+        info.name.text = "Нет предмета"
+        info.list:hideAll()
+        return
+    end
+    info.list:showAll()
     info.name.text = item.name
+    info.list:hide(info.desc)
     info.desc.text = item.desc
+    info.list:show(info.desc)
     local num = info.list:remove(info.rarity)
     info.rarity:removeSelf()
     local fontSize = Gui.settings.sizes.itemInfoFontSize
@@ -788,12 +812,92 @@ Gui.createInventory = function(world)
         inventory:insert(equipment)
         inventory.equipment = equipment
         local x = Gui.settings.sizes.equipmentButtonSize / 2 + Gui.settings.sizes.equipmentListIndent
+
+        local pe = world.players[1].equipment
+        equipment.head = Gui.createButton {
+            image = Gui.settings.images.equipment.head,
+            x = x,
+            width = Gui.settings.sizes.equipmentButtonSize,
+            height = Gui.settings.sizes.equipmentButtonSize,
+            onTap = function()
+                inventory.info.isVisible = true
+                Gui.updateItemInfo(pe.head)
+            end
+        }
+        equipment.chest = Gui.createButton {
+            image = Gui.settings.images.equipment.chest,
+            x = x,
+            width = Gui.settings.sizes.equipmentButtonSize,
+            height = Gui.settings.sizes.equipmentButtonSize,
+            onTap = function()
+                inventory.info.isVisible = true
+                Gui.updateItemInfo(pe.chest)
+            end
+        }
+        equipment.legs = Gui.createButton {
+            image = Gui.settings.images.equipment.legs,
+            x = x,
+            width = Gui.settings.sizes.equipmentButtonSize,
+            height = Gui.settings.sizes.equipmentButtonSize,
+            onTap = function()
+                inventory.info.isVisible = true
+                Gui.updateItemInfo(pe.legs)
+            end
+        }
+        equipment.bracers = Gui.createButton {
+            image = Gui.settings.images.equipment.bracers,
+            x = x,
+            width = Gui.settings.sizes.equipmentButtonSize,
+            height = Gui.settings.sizes.equipmentButtonSize,
+            onTap = function()
+                inventory.info.isVisible = true
+                Gui.updateItemInfo(pe.bracers)
+            end
+        }
         equipment.foots = Gui.createButton {
             image = Gui.settings.images.equipment.foots,
             x = x,
             width = Gui.settings.sizes.equipmentButtonSize,
-            height = Gui.settings.sizes.equipmentButtonSize
+            height = Gui.settings.sizes.equipmentButtonSize,
+            onTap = function()
+                inventory.info.isVisible = true
+                Gui.updateItemInfo(pe.foots)
+            end
         }
+        local swiper = Gui.createSwiper {indent = gh / 100, direction = "right"} --
+        equipment.hands1 = Gui.createButton {
+            image = Gui.settings.images.equipment.hands1,
+            parent = swiper,
+            x = x,
+            width = Gui.settings.sizes.equipmentButtonSize,
+            height = Gui.settings.sizes.equipmentButtonSize,
+            disableTouch = true,
+            onTap = function()
+                inventory.info.isVisible = true
+                Gui.updateItemInfo(pe.hands[1])
+            end,
+            onDoubleTap = function(self, event)
+                swiper:activate()
+                return true
+            end
+        }
+        equipment.hands2 = Gui.createButton {
+            image = Gui.settings.images.equipment.hands2,
+            x = x,
+            width = Gui.settings.sizes.equipmentButtonSize,
+            height = Gui.settings.sizes.equipmentButtonSize,
+            onTap = function()
+                inventory.info.isVisible = true
+                Gui.updateItemInfo(pe.hands[2])
+            end
+        }
+        swiper.main = equipment.hands1
+        swiper:add(equipment.hands2)
+        equipment:add(swiper)
+        equipment:add(equipment.head)
+        equipment:add(equipment.chest)
+        equipment:add(equipment.bracers)
+        equipment:add(equipment.legs)
         equipment:add(equipment.foots)
     end
 
@@ -847,7 +951,7 @@ Gui.createInventory = function(world)
         list.y = y
         info.desc = display.newText {
             parent = info,
-            text = ("Desc"):rep(10),
+            text = ("Desc"):rep(1),
             font = native.systemFont,
             fontSize = fontSize,
             x = x,
@@ -958,7 +1062,7 @@ Gui.createInterface = function(world)
     local interface = {}
     interface.group = display.newGroup()
     local indent = gh / 60
-    local swiper = Gui.createSwiper {indent = 5} --
+    local swiper = Gui.createSwiper {indent = gh / 150} --
     interface.swiper = swiper
     interface.group:insert(swiper)
     local size = Gui.settings.sizes.inGameMenuButtonWidth
