@@ -31,7 +31,7 @@ Gui.settings = {
     },
     masks = {}
 }
-Gui.settings.catalogs.battleActionImages = Gui.settings.catalogs.interface .. "battleActions/"
+Gui.settings.catalogs.battleActionsImages = Gui.settings.catalogs.interface .. "battleActions/"
 Gui.settings.catalogs.equipment = Gui.settings.catalogs.interface .. "equipment/"
 do
     local edir = Gui.settings.catalogs.equipment
@@ -588,8 +588,8 @@ Gui.displayBattle = function(battle)
             isRight = true,
             x = 0
         }
-        rightBars:add(entity.graphics.hpbar)
         entity.graphics.hpbar:setProgress(entity.health / entity.healthmax)
+        rightBars:add(entity.graphics.hpbar)
     end
 end
 
@@ -625,6 +625,46 @@ local iconMeta = {
     }
 }
 
+Gui.displayBattleIcon = function(battle)
+    battle.graphics = {icon = Gui.createIcon("battle")}
+    battle.graphics.icon:translate(battle.position.x, battle.position.y)
+    return battle.graphics.icon
+end
+
+Gui.displayEntity = function(entity)
+    local icon = Gui.createIcon("entity")
+    entity.graphics = {icon = icon}
+    icon:translate(entity.position.x, entity.position.y)
+    icon.text = display.newText {
+        parent = icon,
+        y = -icon.frame.path.radius * 1.05,
+        text = (entity.surname and (entity.surname .. " ") or "") .. entity.name,
+        align = "center",
+        font = native.systemFont,
+        fontSize = icon.frame.path.radius / 2
+    }
+    icon.text.anchorY = 1
+    icon:addEventListener("tap", function(event)
+        if event.time - (event.target.time or 0) < system.tapDelay then
+            local player = entity.position.loc.world.players[1]
+            player:move({x = event.target.x, y = event.target.y}, function()
+                local battle = entity.position.loc:newBattle{
+                    left = {},
+                    right = {},
+                    position = {loc = entity.position.loc, x = entity.position.x, y = entity.position.y}
+                }
+                battle:addEntity(player, "left")
+                battle:addEntity(entity, "right")
+                
+                battle:run()
+            end)
+        end
+        event.target.time = event.time
+        return true
+    end)
+    return icon
+end
+
 Gui.displayLocation = function(location)
     local location = location
     location.graphics = {}
@@ -653,24 +693,11 @@ Gui.displayLocation = function(location)
         group:insert(path.graphics.icon)
     end
     for key, battle in ipairs(location.battles) do
-        battle.graphics = {icon = Gui.createIcon("battle")}
-        battle.graphics.icon:translate(battle.position.x, battle.position.y)
-        group:insert(battle.graphics.icon)
+
+        group:insert(Gui.displayBattleIcon(battle))
     end
     for key, entity in ipairs(location.entities) do
-        local icon = Gui.createIcon("entity")
-        entity.graphics = {icon = icon}
-        icon:translate(entity.position.x, entity.position.y)
-        icon.text = display.newText {
-            parent = icon,
-            y = -icon.frame.path.radius * 1.05,
-            text = (entity.surname and (entity.surname .. " ") or "") .. entity.name,
-            align = "center",
-            font = native.systemFont,
-            fontSize = icon.frame.path.radius / 2
-        }
-        icon.text.anchorY = 1
-        group:insert(icon)
+        group:insert(Gui.displayEntity(entity))
     end
     return lgraphics
 end
@@ -714,9 +741,10 @@ Gui.updateItemInfo = function(item)
     local num = info.list:remove(info.rarity)
     info.rarity:removeSelf()
     local fontSize = Gui.settings.sizes.itemInfoFontSize
+    local x = -info.background.width + gw / 200
     info.rarity = display.newColorText {
-        parent = info,
-        text = "Качество: <#(0, ff, 0), [48], (0, 0, ff)>" .. item.rarity,
+        parent = info.list,
+        text = "Качество: <#(0, ff, 0), [48], (0, 0, ff)>" .. item.tags[1],
         font = native.systemFont,
         fontSize = fontSize,
         x = x,
@@ -725,8 +753,8 @@ Gui.updateItemInfo = function(item)
     info.rarity.anchorX = 0
     info.rarity.anchorY = 0
     info.list:add(info.rarity, num)
-    info.list:hide(info.desc)
-    info.list:show(info.desc)
+    --info.list:hide(info.desc)
+    --info.list:show(info.desc)
     info.durability.text = "Прочность: " .. item.durability ..
                                (rawget(item, "durabilitymax") and "/" .. item.durabilitymax or "")
 end
