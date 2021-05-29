@@ -1,7 +1,15 @@
-local Gui = require("Gui")
-
+local dir = select(1, ...)
+for i = #dir, 1, -1 do
+    if dir:sub(i, i) == '.' then
+        dir = dir:sub(1, i)
+        break
+    end
+end
+if dir == select(1, ...) then
+    dir = ""
+end
 local World = {settings = {minDistItemMerge = 0.05}}
-local Entity = require("Entity")
+local Entity = require(dir .. "Entity")
 local lootMeta = {
     __index = {
         setObscurity = function(self, obscurity)
@@ -36,22 +44,12 @@ local battleMeta = {
             self[key][#self[key] + 1] = entity
             entity.battle = self
             if entity == self.position.loc.world.players[1] then
-                Gui.displayBattle(self)
+                self.graphics.displayBattle(self)
             else
                 entity:think()
                 entity.battleBuffer:run()
                 if self.graphics and self.graphics.scene then
-                    local barWidth = Gui.settings.sizes.battle.barWidth
-                    local barHeight = Gui.settings.sizes.battle.barHeight
-                    entity.graphics = entity.graphics or {}
-                    entity.graphics.hpbar = Gui.createProgressView {
-                        bgShape = "roundedRect",
-                        barShape = "roundedRect",
-                        width = barWidth,
-                        height = barHeight,
-                        fill = {1, 0, 0},
-                        isRight = self.graphics.scene[key] == "rightBars" and true
-                    }
+                    entity.graphics.displayhpbar(entity, key)
                     entity.graphics.hpbar:setProgress(entity.health / entity.healthmax)
                     self.graphics.scene[self.graphics.scene[key]]:add(entity.graphics.hpbar)
                 end
@@ -193,7 +191,7 @@ local locationMeta = {
             self.battles[#self.battles + 1] = battle
             if self == self.world.players[1].position.loc then
                 self.graphics = self.graphics or {}
-                self.graphics.group:insert(Gui.displayBattleIcon(battle))
+                self.graphics.group:insert(battle.graphics.displayBattleIcon(battle))
             end
         end,
         removeBattle = function(self, battle)
