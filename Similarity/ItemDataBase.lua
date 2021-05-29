@@ -22,18 +22,21 @@
 local ItemDataBase = {
     -- Money
     copper_coin = {
+        id = "copper_coin",
         name = "Медная монета",
         tags = {"Unrare", "Loot", "Money"},
         desc = "Самая дешевая валюта",
         countmax = 100
     },
     silver_coin = {
+        id = "copper_coin",
         name = "Серебреная монета",
         tags = {"Unrare", "Loot", "Money"},
         desc = "Красиво переливающаеся на солнце монета",
         countmax = 100
     },
     gold_coin = {
+        id = "copper_coin",
         name = "Золотая монета",
         tags = {"Unrare", "Loot", "Money"},
         desc = "Ярко сияющая монета",
@@ -61,6 +64,7 @@ local ItemDataBase = {
         durability = 10
     },
     spear = {
+        id = "spear",
         name = "Обычное копье",
         tags = {"Common", "Equipment", "Weapon", "Spear", "Twohanded"},
         damage = 5.5,
