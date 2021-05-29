@@ -1,7 +1,15 @@
-require("supplement")
-local ItemDataBase = require("ItemDataBase")
-local Gui = require("Gui")
-local gw, gh = display.contentWidth, display.contentHeight
+local dir = select(1, ...)
+for i = #dir, 1, -1 do
+    if dir:sub(i, i) == '.' then
+        dir = dir:sub(1, i)
+        break
+    end
+end
+if dir == select(1, ...) then
+    dir = ""
+end
+local ItemDataBase = require(dir .. "ItemDataBase")
+require(dir .. "supplement")
 local Storage = {}
 local Item = {}
 
@@ -40,7 +48,6 @@ local storageMeta = {
                             slot:setCount(slot.count + count)
                             return true
                         end
-
                     end
                 end
             end
@@ -92,47 +99,21 @@ local storageMeta = {
             self.countmax = countmax
         end,
 
-        createSlot = function(self, item, count)
+        createSlot = function(self, item, count, unlimited)
             local count = count or 1
+            while not unlimited and item.countmax and count > item.countmax do
+                count = count - item.countmax
+                if not self:createSlot(item, item.countmax) then
+                    return false
+                end
+            end
             if #self.slots < self.countmax then
                 local index = #self.slots + 1
-                self.slots[index] = {count = count, item = item, graphics = {}} -- TODO update interface
+                self.slots[index] = {count = count, item = item, storage = self} -- TODO update interface
                 setmetatable(self.slots[index], slotMeta)
                 if self.graphics then
-                    local slotGraphics = self.slots[index].graphics
-                    local indent = gw / 100
-                    local width = gw / 3 - 2 * indent
-                    slotGraphics.button = Gui.createButton {
-                        width = width,
-                        fill = {0.5, 0.3, 0.3},
-                        height = gh / 10,
-                        shape = "roundedRect",
-                        cornerRadius = Gui.settings.sizes.slotButtonCornerRadius,
-                        disableTouch = true,
-                        onTap = function()
-                            Gui.inventory.info.isVisible = true
-                            Gui.updateItemInfo(item)
-                        end
-                    }
-                    slotGraphics.name = display.newText {
-                        parent = slotGraphics.button,
-                        x = indent - width / 2,
-                        text = item.name,
-                        fontSize = gh / 15
-                    }
-                    slotGraphics.name.fill = {0, 0, 0}
-                    slotGraphics.name.anchorX = 0
-                    slotGraphics.count = display.newText {
-                        parent = slotGraphics.button,
-                        x = width / 2 - indent,
-                        text = "x" .. count,
-                        fontSize = gh / 15
-                    }
-                    slotGraphics.count.fill = {0, 0, 0}
-                    slotGraphics.count.anchorX = 1
-                    self.graphics.list:add(slotGraphics.button)
+                    self.graphics.displaySlot(self.slots[index])
                 end
-
                 return true
             end
             return false
@@ -150,7 +131,7 @@ local defaultItemMethods = { -- TODO
     end,
 
     setTags = function(self, tags)
-        self.tags = tags
+        self.tags = table.fullCopy(tags)
     end,
 
     addTag = function(self, tag)
@@ -170,7 +151,7 @@ local defaultItemMethods = { -- TODO
     end,
 
     setStats = function(self, stats)
-        self.stats = stats
+        self.stats = table.fullCopy(stats)
     end,
 
     attack = function(self, me, enemy, block)
@@ -185,6 +166,7 @@ local defaultItemMethods = { -- TODO
         else
             damage = enemy:getDamage(self.damage * me.strength * (1 - block))
         end
+        self:getHarm(damage)
         return damage
     end,
 
@@ -284,7 +266,8 @@ Item.new = function(options)
         accuracy = options.accuracy,
         cooldown = options.cooldown,
         durability = options.durability,
-        attackCooldown = options.attackCooldown
+        attackCooldown = options.attackCooldown,
+        block = options.block
     }
     setmetatable(item.tags, itemTagsMeta)
     setmetatable(item, itemMeta)
