@@ -1,7 +1,16 @@
-local Storage = require("Storage")
+local dir = select(1, ...)
+for i = #dir, 1, -1 do
+    if dir:sub(i, i) == '.' then
+        dir = dir:sub(1, i)
+        break
+    end
+end
+if dir == select(1, ...) then
+    dir = ""
+end
+local Storage = require(dir .. "Storage")
 local Item = Storage.Item
-local ItemDataBase = require("ItemDataBase")
-local Gui = require("Gui")
+local ItemDataBase = require(dir .. "ItemDataBase")
 
 local Entity = {}
 local battleBufferMeta
@@ -47,8 +56,8 @@ battleBufferMeta = {
             self[last].item = item
             self[last].event = event
             setmetatable(self[last], battleActionMeta)
-            if me == me.position.loc.world.players[1] then
-                Gui.displayBattleAction(self[last])
+            if me.position and me.position.loc and me == me.position.loc.world.players[1] then
+                me.graphics.displayBattleAction(self[last]) -- todo
             else
                 self:run()
             end
@@ -220,7 +229,6 @@ local entityMeta = {
                     end
                 end
             end
-            print(self.name .. " - Получил урон " .. damage)
             if self.health <= 0 then
                 self:death()
             end
@@ -240,12 +248,10 @@ local entityMeta = {
                     self.graphics.icon:removeSelf()
                 end
             end
-
-            print(self.name .. " умер")
-            if self.position.loc.world:clear(self) then
+            if self.position and self.position.loc and self.position.loc.world:clear(self) then
                 return true
             else
-                assert(false, "Didn't find entity to clear")
+                -- assert(false, "Didn't find entity to clear")
             end
         end,
         think = function(self)
@@ -262,7 +268,7 @@ local entityMeta = {
                     local enemyNum = math.random(#self.battle[enemySide])
                     for key, weapon in pairs(self.equipment.hands) do
                         if weapon.tags:find("Broken") then
-                            self.equipment.hands[key] = nil
+                            self.equipment.hands[key]:unequip(key) -- todo
                         else
                             weapon:tryAttack(self, self.battle[enemySide][enemyNum])
                         end
@@ -271,22 +277,27 @@ local entityMeta = {
             end
         end,
         equip = function(self, item, tag)
-            self:unequip(tag)
-            if type(tag) == "number" then
-                self.equipment.hands[tag] = item
-            else
-                self.equipment[tag] = item
+            if item.tags:find(
+                ({head = "Head", chest = "Chest", legs = "Legs", foots = "Foots", bracers = "Bracers"})[tag] or "Weapon") then
+                self:unequip(tag)
+                if type(tag) == "number" then
+                    self.equipment.hands[tag] = item
+                else
+                    self.equipment[tag] = item
+                end
+                return true
             end
+            return false
         end,
         unequip = function(self, tag)
             if type(tag) == "number" then
                 if not self.equipment.hands[tag] then
-                    return
+                    return true
                 end
                 if self.equipment.hands[tag].id == "hand" then
                     self.equipment.hands[1] = nil
                     self.equipment.hands[2] = nil
-                    return
+                    return true
                 end
                 self.inventory:addItem(self.equipment.hands[tag])
                 self.equipment.hands[tag] = nil
@@ -294,13 +305,17 @@ local entityMeta = {
                     self.equipment.hands[1] = Item.new({id = "hand"})
                     self.equipment.hands[2] = Item.new({id = "hand"})
                 end
+                return true
             else
-                if not self.equipment[tag] then
-                    return
+                if not self.equipment[tag] or self.equipment[tag].tags:find("Broken") then
+                    self.equipment[tag] = nil
+                    return true
                 end
                 self.inventory:addItem(self.equipment[tag])
                 self.equipment[tag] = nil
+                return true
             end
+            return false
         end
     }
 }
@@ -339,7 +354,7 @@ Entity.new = function(options)
     setmetatable(entity, entityMeta)
     entity.equipment.hands[1] = Item.new({id = "hand"})
     entity.equipment.hands[2] = Item.new({id = "hand"})
-    for k, v in pairs(options.equipment) do
+    for k, v in pairs(options.equipment or {}) do
         if k == "hands" then
             for key, value in pairs(v) do
                 local weapon = Item.new(value)
@@ -351,8 +366,8 @@ Entity.new = function(options)
         end
     end
     local location = entity.position.loc
-    if location.graphics and location.graphics.group then
-        location.graphics.group:insert(Gui.displayEntity(entity))
+    if location and location.graphics and location.graphics.group then
+        location.graphics.group:insert(location.graphics.displayEntity(entity)) -- todo
     end
     return entity
 end
@@ -400,6 +415,7 @@ return Entity
                 hpbar = display.object,
                 icon = {image = display.object, hpdiagramm = display.object},
                 image = display.object,
+                displayBattleAction=function() end,
                 equipment = {
                     hands = gui.swiper,
                     bracers = gui.button,
