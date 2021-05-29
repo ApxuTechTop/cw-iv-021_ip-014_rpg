@@ -3,7 +3,7 @@ BUILD_DIR=builder
 build:
 	./$(BUILD_DIR)/CoronaBuilder.exe build --lua $(BUILD_DIR)/build.android.lua
 
-.PHONY: test
+.PHONY: tests
 tests: tests.lua
 	lua tests.lua
 
