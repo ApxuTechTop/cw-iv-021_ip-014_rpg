@@ -1,7 +1,3 @@
-utf8 = require("plugin.utf8")
-
-require("ColorText")
-
 table.equal = function(tab1, tab2, stack) -- TODO
     local b = true
     local stack = stack or {}
@@ -10,15 +6,15 @@ table.equal = function(tab1, tab2, stack) -- TODO
 
     stack[tab1][tab2] = true
     for k, v in pairs(tab1) do
-        if not tab2[k] == v then
+        if not (tab2[k] == v) then
             if type(tab2[k]) == "table" and type(v) == "table" then
-                if not stack[v][tab2[k]] then
+                if stack[v] and not stack[v][tab2[k]] then
                     b = table.equal(v, tab2[k], stack)
                     if not b then
                         return b
                     end
                 end
-            elseif (tab2[k] ~= v) then
+            else
                 return false
             end
         end
@@ -34,13 +30,14 @@ end
 table.fullCopy = function(tab, stack)
     local stack = stack or {}
     local tabCopy = {}
-    stack[tab] = true
+    stack[tab] = tabCopy
     for k, v in pairs(tab) do
         if type(v) == "table" then
             if not stack[v] then
-                stack[v] = true
                 tabCopy[k] = table.fullCopy(v, stack)
                 setmetatable(tabCopy[k], getmetatable(v))
+            else
+                tabCopy[k] = stack[v]
             end
         else
             tabCopy[k] = v
