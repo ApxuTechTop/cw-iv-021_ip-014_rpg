@@ -5,6 +5,8 @@
 Данный код писался на телефоне с лагающим сенсором, из-за чего автор испытывал дикий дискомфорт.
 Поэтому, здесь есть что править и оптимизировать. 
 --]]--
+utf8 = require("plugin.utf8")
+
 local newText = display.newText
 local newGroup = display.newGroup
 local find = utf8.find
