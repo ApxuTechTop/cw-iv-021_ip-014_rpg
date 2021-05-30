@@ -38,9 +38,9 @@ local storageMeta = {
         addItem = function(self, item, count)
             local count = count or 1
             for k, slot in ipairs(self.slots) do
-                if slot.count < slot.item.countmax then
+                if not slot.item.countmax or slot.count < slot.item.countmax then
                     if table.equal(slot.item, item) then
-                        local dCount = slot.item.countmax - slot.count
+                        local dCount = slot.item.countmax and (slot.item.countmax - slot.count) or (count + 1)
                         if count >= dCount then
                             slot:setCount(slot.count + dCount)
                             count = count - dCount
@@ -111,7 +111,7 @@ local storageMeta = {
                 local index = #self.slots + 1
                 self.slots[index] = {count = count, item = item, storage = self} -- TODO update interface
                 setmetatable(self.slots[index], slotMeta)
-                if self.graphics then
+                if self.graphics and self.graphics.list then
                     self.graphics.displaySlot(self.slots[index])
                 end
                 return true
