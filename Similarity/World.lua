@@ -14,22 +14,6 @@ local lootMeta = {
     __index = {
         setObscurity = function(self, obscurity)
             self.obscurity = obscurity
-        end,
-        addItem = function(self, item)
-            self.items[#self.items + 1] = item
-        end,
-        removeItem = function(self, item)
-            if type(item) == "table" then
-                for i = 1, #self.items do
-                    if self.items[i] == item then
-                        table.remove(self.items, i)
-                    end
-                end
-            elseif type(item) == "number" then
-                table.remove(self.items, i)
-            else
-                assert(false, "Expected number or table")
-            end
         end
     }
 }
@@ -74,7 +58,6 @@ local battleMeta = {
                     end
                 end
                 if num then
-                    print(key, num)
                     self[key][num].battle = nil
                     table.remove(self[key], num)
                     if #self[key] == 0 then
@@ -130,7 +113,6 @@ local spotMeta = {
                         weigth = weigth - v.weigth
                         if weigth <= 0 then
                             timer.performWithDelay(v.time, function()
-                                print(v.entityOptions.name .. " " .. v.count + 1)
                                 self:createMob(v)
                                 self.spawned = nil
                                 self:run()
@@ -212,7 +194,7 @@ local locationMeta = {
         end,
         addLootItem = function(self, item, pos)
             if #self.loot == 0 then
-                return locationMeta.__index.newLoot(self, {pos = pos, items = {item}})
+                return self:newLoot({pos = pos, items = Storage.new(20):createSlot(item, 1, true)})
             end
             local min = math.distance(self.loot[1].pos, pos)
             local minI = 1
@@ -223,10 +205,10 @@ local locationMeta = {
                 end
             end
             if min <= 0.05 then
-                self.loot[minI].items[#self.loot[minI].items + 1] = item
+                self.loot[minI].items:addItem(item, 1)
                 return self.loot[minI]
             else
-                return locationMeta.__index.newLoot(self, {pos = pos, items = {item}})
+                return self:newLoot({pos = pos, items = Storage.new(20):createSlot(item, 1, true)})
             end
         end,
         removeLoot = function(self, loot)
@@ -243,7 +225,9 @@ local locationMeta = {
             end
         end,
         newLoot = function(self, options)
-            local loot = {}
+            local loot = {pos = options.pos, items = options.items, obscurity = options.obscurity}
+            loot.items.parent = loot
+            self:addLoot(loot)
             setmetatable(loot, lootMeta);
             return loot
         end,
@@ -251,7 +235,11 @@ local locationMeta = {
             local battle = {
                 position = options.position or {loc = self, x = 50, y = 50},
                 left = options.left or {},
-                right = options.right or {}
+                right = options.right or {},
+                graphics = {
+                    displayBattleIcon = self.graphics.displayBattleIcon,
+                    displayBattle = self.graphics.displayBattle
+                }
             }
             battle.position.loc = battle.position.loc or self
             setmetatable(battle, battleMeta)
@@ -296,7 +284,7 @@ local worldMeta = {
         clear = function(self, entity)
             local location = entity.position.loc
             if not location:removeEntity(entity) then
-                assert(false, "Didn't find entity")
+                print("Didn't find entity" .. entity.name)
             end
             for k, v in pairs(location.battles) do
                 if v:removeEntity(entity) then
@@ -355,7 +343,7 @@ location = {
     end,
     path = {{id = "string", pos = {1, 0.5}, image = "string", graphics = gui.icon}},
     entities = {entity},
-    loot = {{items = {item}, pos = {0.2, 0.2}, obscurity = -1}},
+    loot = {{items = st, pos = {0.2, 0.2}, obscurity = -1}},
     battles = {battle},
     world = world,
     spots={spot},
