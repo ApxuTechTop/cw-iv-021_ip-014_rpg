@@ -1,4 +1,15 @@
-require("supplement")
+local dir = select(1, ...)
+for i = #dir, 1, -1 do
+    if dir:sub(i, i) == '.' then
+        dir = dir:sub(1, i)
+        break
+    end
+end
+if dir == select(1, ...) then
+    dir = ""
+end
+local ItemDataBase = require(dir .. "ItemDataBase")
+require(dir .. "supplement")
 local Storage = {}
 local Item = {}
 
@@ -18,15 +29,18 @@ local slotMeta = {
 local storageMeta = {
     __index = {
         addSlot = function(self, slot)
-            self.slots[#self.slots + 1] = slot
+            local size = #self.slots + 1
+            if size <= self.countmax then
+                self.slots[size] = slot
+            end
         end,
 
         addItem = function(self, item, count)
             local count = count or 1
             for k, slot in ipairs(self.slots) do
-                if slot.count < slot.item.countmax then
+                if not slot.item.countmax or slot.count < slot.item.countmax then
                     if table.equal(slot.item, item) then
-                        local dCount = slot.item.countmax - slot.count
+                        local dCount = slot.item.countmax and (slot.item.countmax - slot.count) or (count + 1)
                         if count >= dCount then
                             slot:setCount(slot.count + dCount)
                             count = count - dCount
@@ -34,7 +48,6 @@ local storageMeta = {
                             slot:setCount(slot.count + count)
                             return true
                         end
-
                     end
                 end
             end
@@ -86,11 +99,21 @@ local storageMeta = {
             self.countmax = countmax
         end,
 
-        createSlot = function(self, item, count)
+        createSlot = function(self, item, count, unlimited)
             local count = count or 1
+            while not unlimited and item.countmax and count > item.countmax do
+                count = count - item.countmax
+                if not self:createSlot(item, item.countmax) then
+                    return false
+                end
+            end
             if #self.slots < self.countmax then
-                self.slots[#self.slots + 1] = {count = count, item = item} -- TODO update interface
-                setmetatable(self.slots[#self.slots], slotMeta)
+                local index = #self.slots + 1
+                self.slots[index] = {count = count, item = item, storage = self} -- TODO update interface
+                setmetatable(self.slots[index], slotMeta)
+                if self.graphics and self.graphics.list then
+                    self.graphics.displaySlot(self.slots[index])
+                end
                 return true
             end
             return false
@@ -108,7 +131,7 @@ local defaultItemMethods = { -- TODO
     end,
 
     setTags = function(self, tags)
-        self.tags = tags
+        self.tags = table.fullCopy(tags)
     end,
 
     addTag = function(self, tag)
@@ -128,7 +151,7 @@ local defaultItemMethods = { -- TODO
     end,
 
     setStats = function(self, stats)
-        self.stats = stats
+        self.stats = table.fullCopy(stats)
     end,
 
     attack = function(self, me, enemy, block)
@@ -143,6 +166,7 @@ local defaultItemMethods = { -- TODO
         else
             damage = enemy:getDamage(self.damage * me.strength * (1 - block))
         end
+        self:getHarm(damage)
         return damage
     end,
 
@@ -157,6 +181,9 @@ local defaultItemMethods = { -- TODO
     end,
 
     getHarm = function(self, harm)
+        if not self.durability then
+            return
+        end
         self.durability = self.durability - harm
         if self.durability <= 0 then
             self.tags:add("Broken")
@@ -205,36 +232,42 @@ local itemTagsMeta = {
 
 local itemMeta = {
     __index = function(self, key)
-        if rawget(self, "id") and itemDataBase[self.id] and itemDataBase[self.id][key] then
-            return itemDataBase[self.id][key]
+        if rawget(self, "id") and ItemDataBase[self.id] and ItemDataBase[self.id][key] then
+            return ItemDataBase[self.id][key]
         elseif defaultItemMethods[key] ~= nil then
             return defaultItemMethods[key]
         end
-        assert(false, "Didn't find value at index " .. key)
+        -- assert(false, "Didn't find value at index " .. key)
     end
 }
 
 Storage.new = function(capacity, slots)
-    local storage = {countmax = capacity, slots = slots or {}}
+    local storage = {countmax = capacity or 10, slots = slots or {}}
     setmetatable(storage, storageMeta)
     return storage
 end
 
 Item.new = function(options)
+    if options.id and ItemDataBase[options.id] then
+        local item = table.fullCopy(ItemDataBase[options.id])
+        setmetatable(item.tags, itemTagsMeta)
+        setmetatable(item, itemMeta)
+        return item
+    end
     local item = {
         id = options.id,
         name = options.name,
         desc = options.desc,
-        tags = options.tags,
-        rarity = options.rariti,
+        tags = table.fullCopy(options.tags),
         armor = options.armor,
         damage = options.damage,
-        stats = options.stats,
+        stats = options.stats and table.fullCopy(options.stats),
         critDamage = options.critDamage,
         accuracy = options.accuracy,
         cooldown = options.cooldown,
         durability = options.durability,
-        attackCooldown = options.attackCooldown
+        attackCooldown = options.attackCooldown,
+        block = options.block
     }
     setmetatable(item.tags, itemTagsMeta)
     setmetatable(item, itemMeta)

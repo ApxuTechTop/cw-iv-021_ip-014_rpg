@@ -1,25 +1,19 @@
+local dir = select(1, ...)
+for i = #dir, 1, -1 do
+    if dir:sub(i, i) == '.' then
+        dir = dir:sub(1, i)
+        break
+    end
+end
+if dir == select(1, ...) then
+    dir = ""
+end
 local World = {settings = {minDistItemMerge = 0.05}}
-
+local Entity = require(dir .. "Entity")
 local lootMeta = {
     __index = {
         setObscurity = function(self, obscurity)
             self.obscurity = obscurity
-        end,
-        addItem = function(self, item)
-            self.items[#self.items + 1] = item
-        end,
-        removeItem = function(self, item)
-            if type(item) == "table" then
-                for i = 1, #self.items do
-                    if self.items[i] == item then
-                        table.remove(self.items, i)
-                    end
-                end
-            elseif type(item) == "number" then
-                table.remove(self.items, i)
-            else
-                assert(false, "Expected number or table")
-            end
         end
     }
 }
@@ -33,7 +27,19 @@ local battleMeta = {
             end
             self[key][#self[key] + 1] = entity
             entity.battle = self
-            -- ивент на отображение
+            if entity == self.position.loc.world.players[1] then
+                self.graphics.displayBattle(self)
+            else
+                entity:think()
+                entity.battleBuffer:run()
+                if self.graphics and self.graphics.scene then
+                    entity.graphics.displayhpbar(entity, key)
+                    entity.graphics.hpbar:setProgress(entity.health / entity.healthmax)
+                    self.graphics.scene[self.graphics.scene[key]]:add(entity.graphics.hpbar)
+                end
+            end
+            entity:think()
+            entity.battleBuffer:run()
         end,
         removeEntity = function(self, entity, key)
             if key and key ~= "right" and key ~= "left" then
@@ -52,13 +58,16 @@ local battleMeta = {
                     end
                 end
                 if num then
-                    print(key, num)
                     self[key][num].battle = nil
                     table.remove(self[key], num)
                     if #self[key] == 0 then
                         local enemySide = (key == "left") and "right" or "left"
                         for i = #self[enemySide], 1, -1 do
                             self:removeEntity(i, enemySide)
+                        end
+                        if self.graphics then
+                            self.graphics.scene:removeSelf()
+                            self.graphics.icon:removeSelf()
                         end
                     end
                     return true
@@ -78,11 +87,72 @@ local battleMeta = {
     }
 }
 
+local spotMeta = {
+    __index = {
+        addMob = function(self, options)
+            local length = #self.mobs + 1
+            self.mobs[length] = {}
+            self.mobs[length].entityOptions = options.entityOptions
+            self.mobs[length].max = options.max
+            self.mobs[length].count = 0
+            self.mobs[length].weigth = options.weigth
+            self.mobs[length].time = options.time
+        end,
+        run = function(self)
+            if self.count < self.max and not self.spawned then
+                self.spawned = true
+                local weigth = 0
+                for _, v in pairs(self.mobs) do
+                    if v.count < v.max then
+                        weigth = weigth + v.weigth
+                    end
+                end
+                weigth = math.random(weigth)
+                for _, v in ipairs(self.mobs) do
+                    if v.count < v.max then
+                        weigth = weigth - v.weigth
+                        if weigth <= 0 then
+                            timer.performWithDelay(v.time, function()
+                                self:createMob(v)
+                                self.spawned = nil
+                                self:run()
+                            end)
+                            return true
+                        end
+                    end
+                end
+            end
+        end,
+        createMob = function(self, mob)
+            local posx = math.random(math.floor(self.position.x - self.radiusX),
+                                     math.floor(self.position.x + self.radiusX))
+            local posy = math.random(math.floor(self.position.y - self.radiusY),
+                                     math.floor(self.position.y + self.radiusY))
+            mob.entityOptions.position = {loc = self.position.loc, x = posx, y = posy}
+            local entity = Entity.new(mob.entityOptions)
+            entity.spot = self
+            entity.position.loc:addEntity(entity)
+            self.count = self.count + 1
+            mob.count = mob.count + 1
+        end,
+        removeMob = function(self, mob)
+            for k, v in pairs(self.mobs) do
+                if v.entityOptions.name == mob.name and v.entityOptions.surname == mob.surname then
+                    v.count = v.count - 1
+                    self.count = self.count - 1
+                end
+            end
+            self:run()
+        end
+    }
+}
+
 local locationMeta = {
     __index = {
         addEntity = function(self, entity, position)
             self.entities = self.entities or {}
             entity.position = position or {loc = self, x = 0, y = 0}
+            entity.position.loc = entity.position.loc or self
             self.entities[#self.entities + 1] = entity
 
             -- ивент на отображение
@@ -101,7 +171,10 @@ local locationMeta = {
         end,
         addBattle = function(self, battle)
             self.battles[#self.battles + 1] = battle
-            -- ивент на отображение
+            if self == self.world.players[1].position.loc then
+                self.graphics = self.graphics or {}
+                self.graphics.group:insert(battle.graphics.displayBattleIcon(battle))
+            end
         end,
         removeBattle = function(self, battle)
             if type(battle) == "table" then
@@ -121,7 +194,7 @@ local locationMeta = {
         end,
         addLootItem = function(self, item, pos)
             if #self.loot == 0 then
-                return locationMeta.__index.newLoot(self, {pos = pos, items = {item}})
+                return self:newLoot({pos = pos, items = Storage.new(20):createSlot(item, 1, true)})
             end
             local min = math.distance(self.loot[1].pos, pos)
             local minI = 1
@@ -132,10 +205,10 @@ local locationMeta = {
                 end
             end
             if min <= 0.05 then
-                self.loot[minI].items[#self.loot[minI].items + 1] = item
+                self.loot[minI].items:addItem(item, 1)
                 return self.loot[minI]
             else
-                return locationMeta.__index.newLoot(self, {pos = pos, items = {item}})
+                return self:newLoot({pos = pos, items = Storage.new(20):createSlot(item, 1, true)})
             end
         end,
         removeLoot = function(self, loot)
@@ -152,27 +225,56 @@ local locationMeta = {
             end
         end,
         newLoot = function(self, options)
-            local loot = {}
+            local loot = {pos = options.pos, items = options.items, obscurity = options.obscurity}
+            loot.items.parent = loot
+            self:addLoot(loot)
             setmetatable(loot, lootMeta);
             return loot
         end,
         newBattle = function(self, options)
             local battle = {
                 position = options.position or {loc = self, x = 50, y = 50},
-                left = options.left,
-                right = options.right
+                left = options.left or {},
+                right = options.right or {},
+                graphics = {
+                    displayBattleIcon = self.graphics.displayBattleIcon,
+                    displayBattle = self.graphics.displayBattle
+                }
             }
             battle.position.loc = battle.position.loc or self
             setmetatable(battle, battleMeta)
-            self.battles = self.battles or {}
-            self.battles[#self.battles + 1] = battle
+            self:addBattle(battle)
             for _, entity in pairs(battle.left) do
-                entity.battle = battle
+                battle:addEntity(entity, "left")
             end
             for _, entity in pairs(battle.right) do
-                entity.battle = battle
+                battle:addEntity(entity, "right")
             end
             return battle
+        end,
+        newSpot = function(self, options)
+            local pos = options.position
+            pos.loc = pos.loc or self
+            pos.x, pos.y = pos.x or 0, pos.y or 0
+            local spot = {
+                position = options.position,
+                radiusX = options.radiusX or 50,
+                radiusY = options.radiusY or 50,
+                mobs = options.mobs or {},
+                max = options.max,
+                count = options.count or 0
+            }
+
+            setmetatable(spot, spotMeta)
+            self.spots[#self.spots + 1] = spot
+            return spot
+        end,
+        removeSpot = function(self, spot)
+            for k, v in pairs(self.spots) do
+                if v == spot then
+                    tabale.remove(self.spots, k)
+                end
+            end
         end
     }
 }
@@ -182,7 +284,7 @@ local worldMeta = {
         clear = function(self, entity)
             local location = entity.position.loc
             if not location:removeEntity(entity) then
-                assert(false, "Didn't find entity")
+                print("Didn't find entity" .. entity.name)
             end
             for k, v in pairs(location.battles) do
                 if v:removeEntity(entity) then
@@ -205,11 +307,14 @@ local worldMeta = {
                 name = options.name,
                 desc = options.desc,
                 texture = options.texture,
-                path = options.path,
-                loot = options.loot,
-                entities = options.entities,
-                battles = options.battles,
-                world = self
+                path = options.path or {},
+                loot = options.loot or {},
+                entities = options.entities or {},
+                battles = options.battles or {},
+                world = self,
+                spots = options.spots or {},
+                width = options.width or 2000,
+                height = options.height or 1000
             }
             setmetatable(location, locationMeta)
             self.locations[location.id] = location
@@ -238,9 +343,10 @@ location = {
     end,
     path = {{id = "string", pos = {1, 0.5}, image = "string", graphics = gui.icon}},
     entities = {entity},
-    loot = {{items = {item}, pos = {0.2, 0.2}, obscurity = -1}},
+    loot = {{items = st, pos = {0.2, 0.2}, obscurity = -1}},
     battles = {battle},
     world = world,
+    spots={spot},
     graphics = {
         texture = display.object,
         info = {
@@ -275,6 +381,14 @@ battle = {
     graphics = gui.icon
 }
 
+spot ={
+    position={loc=location,x=50,y=50},
+    radiusX=25,
+    radiusY=25,
+    mobs={{entity=entity,max=10,count=2,weigth=5,time=10000}},
+    max=10,
+    count=2
+}
 function findItems()
     local l = world.locations[self.position[1]]
     for key, loot in pairs(l.loot) do
