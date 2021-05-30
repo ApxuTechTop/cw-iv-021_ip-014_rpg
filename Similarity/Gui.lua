@@ -554,7 +554,7 @@ Gui.createIcon = function(what, name)
 end
 
 Gui.displaySlot = function(slot)
-    local slotGraphics = slot.graphics
+    local slotGraphics = slot.graphics or {}
     local indent = gw / 100
     local width = gw / 3 - 2 * indent
     slotGraphics.button = Gui.createButton {
@@ -580,7 +580,7 @@ Gui.displaySlot = function(slot)
     slotGraphics.count = display.newText {
         parent = slotGraphics.button,
         x = width / 2 - indent,
-        text = "x" .. count,
+        text = "x" .. slot.count,
         fontSize = gh / 15
     }
     slotGraphics.count.fill = {0, 0, 0}
@@ -702,7 +702,8 @@ local iconMeta = {
 }
 
 Gui.displayBattleIcon = function(battle)
-    battle.graphics = {icon = Gui.createIcon("battle")}
+    battle.graphics = battle.graphics or {}
+    battle.graphics.icon = Gui.createIcon("battle")
     battle.graphics.icon.x = battle.position.x
     battle.graphics.icon.y = battle.position.y
     return battle.graphics.icon
@@ -711,6 +712,10 @@ end
 Gui.displayEntity = function(entity)
     local icon = Gui.createIcon("entity", entity.icon)
     entity.graphics = {icon = icon}
+    entity.graphics.displayBattleAction = Gui.displayBattleAction
+    entity.graphics.displayhpbar = Gui.displayhpbar
+    entity.inventory.graphics = entity.inventory.graphics or {}
+    entity.inventory.graphics.displaySlot = Gui.displaySlot
     icon:translate(entity.position.x, entity.position.y)
     icon.text = display.newText {
         parent = icon,
@@ -745,6 +750,9 @@ end
 Gui.displayLocation = function(location)
     local location = location
     location.graphics = {}
+    location.graphics.displayEntity = Gui.displayEntity
+    location.graphics.displayBattleIcon = Gui.displayBattleIcon
+    location.graphics.displayBattle = Gui.displayBattle
     local lgraphics = location.graphics
     local group = display.newGroup()
     lgraphics.group = group
@@ -796,6 +804,7 @@ Gui.displayWorld = function(world)
     })
     local player = world.players[1]
     local location = player.position.loc
+    world.graphics.displayLocation = Gui.displayLocation
     world.graphics.scroll:add(Gui.displayLocation(location).group)
     --[[
     for key, path in pairs(location.path) do
