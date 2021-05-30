@@ -268,7 +268,7 @@ local entityMeta = {
                     local enemyNum = math.random(#self.battle[enemySide])
                     for key, weapon in pairs(self.equipment.hands) do
                         if weapon.tags:find("Broken") then
-                            self.equipment.hands[key]:unequip(key) -- todo
+                            self:unequip(key) -- todo
                         else
                             weapon:tryAttack(self, self.battle[enemySide][enemyNum])
                         end
