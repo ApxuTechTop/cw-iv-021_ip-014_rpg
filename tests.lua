@@ -772,7 +772,7 @@ test.entity.equip_3 = function()
 end
 
 test.spot.run = function()
-    math.random = setrandom(1, 500, 600, 13, 500, 605, 13, 500, 605, 1, 500, 600, 1, 500, 600,1, 500, 600)
+    math.random = setrandom(1, 500, 600, 13, 500, 605, 13, 500, 605, 1, 500, 600, 1, 500, 600, 1, 500, 600)
     local world = World.new()
     local testLocation = world:newLocation({
         id = "test_location",
