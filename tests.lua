@@ -3,8 +3,71 @@ require("Similarity.ItemDataBase")
 local Storage = require("Similarity.Storage")
 local Item = Storage.Item
 local Entity = require("Similarity.Entity")
+local World = require("Similarity.World")
 require("Similarity.supplement")
 timer = {timers = {}, time = 0}
+local swordOption = {
+    name = "Iron sword",
+    desc = "Обычный ржавый меч",
+    tags = {"Common", "Equipment", "Weapon", "Sword"},
+    damage = 3,
+    critDamage = 1.5,
+    accuracy = 1.2,
+    cooldown = 1500,
+    durability = 15
+}
+
+local goblinRogueOptions = {
+    name = "Гоблин-разбойник",
+    lvl = 3,
+    exp = 0,
+    expmax = 100,
+    energy = 10,
+    mana = 0,
+    manamax = 0,
+    health = 15,
+    healthmax = 15,
+    strength = 2,
+    agility = 2,
+    dexterity = 2,
+    luck = 2,
+    vitality = 2,
+    reaction = 500,
+    equipment = {hands = {swordOption}}
+}
+
+local spearOptions = {
+    name = "short spear",
+    desk = "Немного заурядное короткое копье",
+    tags = {"Equipment", "Weapon", "Spear"},
+    rarity = "Common",
+    damage = 5,
+    critDamage = 1,
+    5,
+    accuracy = 0.9,
+    cooldown = 2500,
+    durability = 15
+}
+local goblinSpearmanOptions = {
+    name = "Гоблин-Копейщик",
+    lvl = 3,
+    exp = 0,
+    expmax = 100,
+    energy = 10,
+    mana = 0,
+    manamax = 0,
+    health = 20,
+    healthmax = 15,
+    strength = 3,
+    agility = 1,
+    5,
+    dexterity = 1,
+    5,
+    luck = 2,
+    vitality = 2,
+    reaction = 550,
+    equipment = {hands = {spearOptions}}
+}
 
 local testEntity1 = {
     name = "testEntity1",
@@ -706,6 +769,37 @@ test.entity.equip_3 = function()
     test.equal(table.equal(testItem, testEntity.equipment.chest), true)
     test.equal(1, #testEntity.inventory.slots)
     test.equal(table.equal(testEntity.inventory.slots[1].item, Item.new {id = "iron_chestplate"}), true)
+end
+
+test.spot.run = function()
+    math.random = setrandom(1, 500, 600, 13, 500, 605, 13, 500, 605, 1, 500, 600, 1, 500, 600,1, 500, 600)
+    local world = World.new()
+    local testLocation = world:newLocation({
+        id = "test_location",
+        name = "Test location",
+        desc = function(self)
+            return ("Its test location "):rep(5)
+        end,
+        entities = {},
+        path = {},
+        battles = {},
+        height = 720 * 5,
+        width = 1520 * 10
+    })
+    local goblinSpot = testLocation:newSpot({position = {x = 1000, y = 1000}, radiusX = 500, radiusY = 500, max = 5})
+    local goblinSpearmanSpotOptions = {entityOptions = goblinSpearmanOptions, max = 2, weigth = 10, time = 1500}
+    local goblinRogueSpotOptions = {entityOptions = goblinRogueOptions, max = 10, weigth = 4, time = 1000}
+    goblinSpot:addMob(goblinRogueSpotOptions)
+    goblinSpot:addMob(goblinSpearmanSpotOptions)
+    goblinSpot:run()
+    timer.autorun()
+    test.equal(2, goblinSpot.mobs[2].count)
+    test.equal(3, goblinSpot.mobs[1].count)
+    testLocation.entities[2]:death()
+    timer.autorun()
+    test.equal(1, goblinSpot.mobs[2].count)
+    test.equal(4, goblinSpot.mobs[1].count)
+    math.rand = oldRand
 end
 
 test.summary()
