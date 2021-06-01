@@ -115,6 +115,9 @@ local type_func_map = {
     ["boolean"] = tostring,
     ["function"] = function(val, stack)
         return "<" .. tostring(val) .. ">"
+    end,
+    ["userdata"] = function(val, stack)
+        return "<" .. tostring(val) .. ">"
     end
 }
 
@@ -162,7 +165,13 @@ do
         ["table"] = encode_table,
         ["string"] = encode_string,
         ["number"] = encode_number,
-        ["boolean"] = tostring
+        ["boolean"] = tostring,
+        ["function"] = function(val, stack)
+            return "<" .. tostring(val) .. ">"
+        end,
+        ["userdata"] = function(val, stack)
+            return "<" .. tostring(val) .. ">"
+        end
     }
 
     encode = function(val, stack)
@@ -391,7 +400,12 @@ local function parse_object(str, i, stack)
         end
         i = next_char(str, i + 1, space_chars, true)
         -- Read value
-        val, i = parse(str, i, stack)
+        local iwas = i
+        val, i2 = parse(str, i, stack)
+        if not i2 then
+            print(str:sub(iwas, #str))
+        end
+        i = i2
         -- Set
         res[key] = val
         -- Next token
@@ -402,7 +416,7 @@ local function parse_object(str, i, stack)
             break
         end
         if chr ~= "," then
-            decode_error(str, i, "expected '}' or ','")
+            decode_error(str, i, "expected '}' or ',', get " .. chr)
         end
     end
     return res, i
@@ -414,8 +428,8 @@ end
 
 local right_arrow = {['>'] = true}
 local function parse_another(str, i, stack)
-    local nc, x = next_char(str, i, right_arrow)
-    return nil, x
+    local x = next_char(str, i, right_arrow)
+    return nil, x + 1
 end
 
 local char_func_map = {
