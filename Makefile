@@ -9,4 +9,5 @@ tests: tests.lua
 
 .PHONY: clean
 clean:
-	find bin -name '*.exe' -exec $(RM) '{}' \;
+	find bin -name '*.apk' -exec $(RM) '{}' \;
+	find bin -name '*.aab' -exec $(RM) '{}' \;
