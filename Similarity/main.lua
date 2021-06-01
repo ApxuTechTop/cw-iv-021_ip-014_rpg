@@ -1,18 +1,6 @@
 require("supplement")
+local saver = require("saver")
 local systemFonts = native.getFontNames()
-
--- Set the string to query for (part of the font name to locate)
-local searchString = "pt"
-
--- Display each font in the Terminal/console
-for i, fontName in ipairs(systemFonts) do
-
-    local j, k = string.find(string.lower(fontName), string.lower(searchString))
-
-    if (j ~= nil) then
-        print("Font Name = " .. tostring(fontName))
-    end
-end
 
 local Gui = require("Gui")
 local json = require("json")
@@ -21,9 +9,14 @@ local World = require("World")
 local Entity = require("Entity")
 local Storage = require("Storage")
 local Item = Storage.Item
+local ItemDataBase = require("ItemDataBase")
+local Locations = require("Locations")
+local Entities = require("Entities")
 
 local cx, cy = display.contentCenterX, display.contentCenterY
 local gw, gh = display.contentWidth, display.contentHeight
+
+print(math.ceil(1, 100))
 
 system.tapDelay = 350
 
@@ -48,184 +41,128 @@ for key, val in pairs({
     }
 end
 
+local saveFile = "save_file.txt"
+local function loadGame(filename)
+    local game = saver.load(filename)
+    local world = game.world
+    World.reload(world)
+
+    for key, location in pairs(world.locations) do
+        location.desc = Locations[key].desc
+        location.texture = Locations[key].texture
+    end
+    for k, location in pairs(world.locations) do
+        for _, spot in pairs(location.spots) do
+            for _, mob in pairs(spot.mobs) do
+                if not mob.entity then
+                    mob.entity = Entities[mob.id]
+                end
+            end
+        end
+    end
+    Gui.displayWorld(world)
+    Gui.createInterface(world)
+    Gui.createInventory(world)
+    world:run()
+    return game
+end
+
+local function saveGame(game, filename, dir)
+    local world = game.world
+    world.graphics = nil
+    for _, location in pairs(world.locations) do
+        location.graphics = nil
+        for _, entity in pairs(location.entities) do
+            if entity.timers then
+                for key, t in pairs(entity.timers) do
+                    timer.cancel(t)
+                    entity.timers[key] = nil
+                end
+            end
+            if entity.transitions then
+                for key, t in pairs(entity.transitions) do
+                    transition.cancel(t)
+                    entity.transitions[key] = nil
+                end
+            end
+            entity.graphics = nil
+            entity.inventory.graphics = nil
+            for _, slot in pairs(entity.inventory.slots) do
+                slot.graphics = nil
+                slot.item.graphics = nil
+            end
+        end
+        for _, battle in pairs(location.battles) do
+            battle.graphics = nil
+        end
+        for _, path in pairs(location.path) do
+            path.graphics = nil
+        end
+    end
+    saver.save(game, filename, dir)
+end
+
+local function onSystemEvent(event)
+    local eventType = event.type
+
+    if (eventType == "applicationStart") then
+        -- Occurs when the application is launched and all code in "main.lua" is executed
+    elseif (eventType == "applicationExit") then
+        saveGame(game, saveFile, system.DocumentsDirectory)
+    elseif (eventType == "applicationSuspend") then
+        -- Perform all necessary actions for when the device suspends the application, i.e. during a phone call
+    elseif (eventType == "applicationResume") then
+        -- Perform all necessary actions for when the app resumes from a suspended state
+    elseif (eventType == "applicationOpen") then
+        -- Occurs when the application is asked to open a URL resource (Android and iOS only)
+    end
+end
+
+Runtime:addEventListener("system", onSystemEvent)
+
+menu[1].onRelease = function(self)
+    game = loadGame(saveFile)
+end
+
 local function startGame(self)
-    local swordOption = {
-        name = "Iron sword",
-        desc = "Обычный ржавый меч",
-        tags = {"Common", "Equipment", "Weapon", "Sword"},
-        damage = 3,
-        critDamage = 1.5,
-        accuracy = 1.2,
-        cooldown = 1500,
-        durability = 15
-    }
-
-    local goblinRogueOptions = {
-        name = "Гоблин-разбойник",
-        icon = Gui.settings.icons.goblinIcon,
-        lvl = 3,
-        exp = 0,
-        expmax = 100,
-        energy = 10,
-        mana = 0,
-        manamax = 0,
-        health = 15,
-        healthmax = 15,
-        strength = 2,
-        agility = 2,
-        dexterity = 2,
-        luck = 2,
-        vitality = 2,
-        reaction = 500,
-        equipment = {hands = {swordOption}}
-    }
-
-    local spearOptions = {
-        name = "short spear",
-        desk = "Немного заурядное короткое копье",
-        tags = {"Equipment", "Weapon", "Spear"},
-        rarity = "Common",
-        damage = 5,
-        critDamage = 1,
-        5,
-        accuracy = 0.9,
-        cooldown = 2500,
-        durability = 15
-    }
-    local goblinSpearmanOptions = {
-        name = "Гоблин-Копейщик",
-        icon = Gui.settings.icons.goblinIcon,
-        lvl = 3,
-        exp = 0,
-        expmax = 100,
-        energy = 10,
-        mana = 0,
-        manamax = 0,
-        health = 20,
-        healthmax = 15,
-        strength = 3,
-        agility = 1,
-        5,
-        dexterity = 1,
-        5,
-        luck = 2,
-        vitality = 2,
-        reaction = 550,
-        equipment = {hands = {spearOptions}}
-    }
     self.isVisible = false
     local world = World.new()
-    local testLocation = world:newLocation({
-        id = "test_location",
-        name = "Test location",
-        desc = function(self)
-            return ("Its test location "):rep(5)
-        end,
-        entities = {},
-        path = {},
-        battles = {},
-        height = 720 * 5,
-        width = 1520 * 10
-    })
-    testLocation.world = world
+    game.world = world
+    world.time = {h = 13, d = 13, m = 1, y = 2021}
+    local town = world:newLocation(Locations.main_town)
+    local rabbitMeadow = world:newLocation(Locations.rabbit_meadow)
+    local forest = world:newLocation(Locations.forest)
+    local tavern = world:newLocation(Locations.tavern)
 
-    local stick = {
-        name = "stick",
-        desc = "a fragile stick",
-        tags = {"Common", "Equipment", "Weapon", "Sword"},
-        damage = 1,
-        critDamage = 4,
-        accuracy = 1.2,
-        cooldown = 1000,
-        durability = 100
-    }
-
-    local ApxuTechTop = Entity.new({
-        name = "ApxuTechTop",
-        level = 5,
-        exp = 0,
-        expmax = 100,
-        reaction = 350,
-        energy = 10,
-        energymax = 10,
-        health = 100,
-        healthmax = 100,
-        strength = 3,
-        agility = 3,
-        dexterity = 3,
-        luck = 3,
-        equipment = {hands = {}},
-        inventory = Storage.new(10),
-        position = {loc = testLocation, x = 600, y = 350}
-    })
-    local ApxuTechTopHelper = Entity.new({
-        name = "ApxuTechTopHelper",
-        level = 5,
-        exp = 0,
-        expmax = 100,
-        reaction = 350,
-        energy = 10,
-        energymax = 10,
-        health = 100,
-        healthmax = 100,
-        strength = 1,
-        agility = 3,
-        dexterity = 3,
-        luck = 3,
-        position = {loc = testLocation, x = 600, y = 350},
-        equipment = {hands = {stick}}
-    })
-
-    local Avili0 = Entity.new({
-        name = "Avili0",
-        level = 5,
-        exp = 0,
-        expmax = 100,
-        reaction = 1200,
-        energy = 10,
-        energymax = 10,
-        health = 20,
-        healthmax = 100,
-        strength = 3,
-        agility = 3,
-        dexterity = 3,
-        luck = 3,
-        equipment = {hands = {}},
-        position = {loc = testLocation, x = 600, y = 350}
-    })
-
-    testLocation:addEntity(ApxuTechTop, ApxuTechTop.position)
-    testLocation:addEntity(Avili0, Avili0.position)
-    testLocation:addEntity(ApxuTechTopHelper, ApxuTechTopHelper.position)
-    world.players = {ApxuTechTop}
-
-    ApxuTechTop:equip(Item.new(stick), 1)
-    Avili0:equip(Item.new(stick), 1)
-    Gui.displayWorld(world)
-    local beatingUp = testLocation:newBattle({right = {}, left = {}, position = {x = 50, y = 50}})
-    -- for i=1,5 do
-    -- testLocation:addEntity(eTabl[i])
-    -- beatingUp:addEntity(eTabl[i],"right")
-    -- end
-    local goblinSpot = testLocation:newSpot({position = {x = 1000, y = 1000}, radiusX = 500, radiusY = 500, max = 5})
-
-    local goblinSpearmanSpotOptions = {entityOptions = goblinSpearmanOptions, max = 2, weigth = 10, time = 1500}
-
-    local goblinRogueSpotOptions = {entityOptions = goblinRogueOptions, max = 10, weigth = 4, time = 1000}
-
-    goblinSpot:addMob(goblinRogueSpotOptions)
-    goblinSpot:addMob(goblinSpearmanSpotOptions)
-    goblinSpot:run()
-    Gui.createInterface(world)
-    beatingUp:addEntity(ApxuTechTop, "left")
-    beatingUp:addEntity(ApxuTechTopHelper, "left")
-    beatingUp:addEntity(Avili0, "right")
-    beatingUp:run()
-    Gui.createInventory(world)
-    for i = 1, 13 do
-        ApxuTechTop.inventory:createSlot(Item.new(stick), 1)
+    for i = 1, math.random(15, 30) do
+        town:addEntity(Entity.new(Entities.create_knight()), {x = math.random(town.width), y = math.random(town.height)})
     end
+    for i = 1, math.random(10) do
+        forest:addEntity(Entity.new(Entities.create_knight()),
+                         {x = math.random(forest.width), y = math.random(forest.height)})
+    end
+    if #town.entities > 0 then
+        world.players = {town.entities[math.random(#town.entities)]}
+    end
+    local rabbitSpot = rabbitMeadow:newSpot{
+        position = {x = rabbitMeadow.width / 2, y = rabbitMeadow.height / 2},
+        radiusX = rabbitMeadow.width / 2,
+        radiusY = rabbitMeadow.height / 2,
+        max = 20
+    }
+    local rabbitSpotOptions = {
+        entity = Entities.create_rabbit,
+        max = 20,
+        weight = 10,
+        time = 1500,
+        id = "create_rabbit"
+    }
+    rabbitSpot:addMob(rabbitSpotOptions)
 
+    Gui.displayWorld(world)
+    Gui.createInterface(world)
+    Gui.createInventory(world)
+    world:run()
 end
 menu[2].onRelease = startGame
 
