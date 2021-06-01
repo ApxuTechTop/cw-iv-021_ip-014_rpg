@@ -144,9 +144,9 @@ timer.run = function()
     local length = #timers
     local lastTimer = timers[length]
     timer.time = math.max(timer.time, lastTimer.fireTime)
-    lastTimer.listener()
+    lastTimer.listener({source = lastTimer})
     lastTimer.iterations = lastTimer.iterations - 1
-    if lastTimer.iterations == 0 then
+    if lastTimer.iterations <= 0 then
         for i = #timers, 1, -1 do
             if lastTimer == timers[i] then
                 table.remove(timers, i)
@@ -772,7 +772,7 @@ test.entity.equip_3 = function()
 end
 
 test.spot.run = function()
-    math.random = setrandom(1, 500, 600, 13, 500, 605, 13, 500, 605, 1, 500, 600, 1, 500, 600, 1, 500, 600)
+    math.random = setrandom(1, 500, 600, 13, 500, 605, 13, 500, 605, 1, 500, 600, 1, 500, 600, 1, 500, 600, 1, 1)
     local world = World.new()
     local testLocation = world:newLocation({
         id = "test_location",
@@ -786,19 +786,19 @@ test.spot.run = function()
         height = 720 * 5,
         width = 1520 * 10
     })
-    local goblinSpot = testLocation:newSpot({position = {x = 1000, y = 1000}, radiusX = 500, radiusY = 500, max = 5})
-    local goblinSpearmanSpotOptions = {entityOptions = goblinSpearmanOptions, max = 2, weigth = 10, time = 1500}
-    local goblinRogueSpotOptions = {entityOptions = goblinRogueOptions, max = 10, weigth = 4, time = 1000}
+    local goblinSpot = testLocation:newSpot({position = {x = 1000, y = 1000}, radiusX = 500, radiusY = 500, max = 3})
+    local goblinSpearmanSpotOptions = {entity = goblinSpearmanOptions, max = 2, weight = 10, time = 1500}
+    local goblinRogueSpotOptions = {entity = goblinRogueOptions, max = 10, weight = 4, time = 1000}
     goblinSpot:addMob(goblinRogueSpotOptions)
     goblinSpot:addMob(goblinSpearmanSpotOptions)
     goblinSpot:run()
     timer.autorun()
     test.equal(2, goblinSpot.mobs[2].count)
-    test.equal(3, goblinSpot.mobs[1].count)
+    test.equal(1, goblinSpot.mobs[1].count)
     testLocation.entities[2]:death()
     timer.autorun()
     test.equal(1, goblinSpot.mobs[2].count)
-    test.equal(4, goblinSpot.mobs[1].count)
+    test.equal(2, goblinSpot.mobs[1].count)
     math.rand = oldRand
 end
 
