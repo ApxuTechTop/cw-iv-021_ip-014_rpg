@@ -29,6 +29,7 @@ local slotMeta = {
 local storageMeta = {
     __index = {
         addSlot = function(self, slot)
+            slot.storage = self
             local size = #self.slots + 1
             if size <= self.countmax then
                 self.slots[size] = slot
@@ -100,6 +101,9 @@ local storageMeta = {
         end,
 
         createSlot = function(self, item, count, unlimited)
+            if count <= 0 then
+                return nil
+            end
             local count = count or 1
             while not unlimited and item.countmax and count > item.countmax do
                 count = count - item.countmax
@@ -247,6 +251,14 @@ Storage.new = function(capacity, slots)
     return storage
 end
 
+Storage.reload = function(storage)
+    setmetatable(storage, storageMeta)
+    for _, slot in pairs(storage.slots) do
+        setmetatable(slot, slotMeta)
+        Item.reload(slot.item)
+    end
+end
+
 Item.new = function(options)
     if options.id and ItemDataBase[options.id] then
         local item = table.fullCopy(ItemDataBase[options.id])
@@ -272,6 +284,10 @@ Item.new = function(options)
     setmetatable(item.tags, itemTagsMeta)
     setmetatable(item, itemMeta)
     return item
+end
+Item.reload = function(item)
+    setmetatable(item, itemMeta)
+    setmetatable(item.tags, itemTagsMeta)
 end
 
 Storage.Item = Item
