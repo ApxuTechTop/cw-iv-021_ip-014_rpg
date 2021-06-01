@@ -1,6 +1,10 @@
 local widget = require("widget")
 require("ColorText")
 
+local function isPlayer(entity)
+    return entity == entity.position.loc.world.players[1]
+end
+
 local cx, cy = display.contentCenterX, display.contentCenterY
 local gw, gh = display.contentWidth, display.contentHeight
 
@@ -41,6 +45,7 @@ do
         entityIcon = ic .. "entityIcon.png",
         battleIcon = ic .. "battleIcon.png",
         goblinIcon = ic .. "goblinIcon.png",
+        pathIcon = ic .. "noneIcon.png",
         noneIcon = ic .. "noneIcon.png"
     }
 end
@@ -110,7 +115,7 @@ local buttonMeta = {
             local ignore
             if event.time - (self.time or 0) < system.tapDelay then
                 if self.onDoubleTap then
-                    ignore = self:onDoubleTap(event.x, event.y)
+                    ignore = self:onDoubleTap(event)
                 end
             else
                 if self.onTap then
@@ -415,6 +420,28 @@ local scrollViewMeta = {
     __index = {
         add = function(self, object)
             self.objectsGroup:insert(object)
+        end,
+        getLimitX = function(self, x)
+            local objectsGroup = self.objectsGroup
+            local bounds = objectsGroup.contentBounds
+            local dxr = objectsGroup.x - bounds.xMax + self.scrollWidth + self.xMaxOffset
+            local dxl = objectsGroup.x - bounds.xMin + self.xMinOffset
+            x = math.max(dxr, x)
+            x = math.min(dxl, x)
+            return x
+        end,
+        getLimitY = function(self, y)
+            local objectsGroup = self.objectsGroup
+            local bounds = objectsGroup.contentBounds
+            local dyr = objectsGroup.y - bounds.yMax + self.scrollHeight + self.yMaxOffset
+            local dyl = objectsGroup.y - bounds.yMin + self.yMinOffset
+            y = math.max(dyr, y)
+            y = math.min(dyl, y)
+            return y
+        end,
+        scrollTo = function(self, x, y)
+            self.objectsGroup.x = self:getLimitX(self.scrollWidth / 2 - x)
+            self.objectsGroup.y = self:getLimitY(self.scrollHeight / 2 - y)
         end
     },
     backgroundTouch = function(self, event)
@@ -423,24 +450,13 @@ local scrollViewMeta = {
             self.isFocus = true
             local scroll = self.parent
             local objectsGroup = scroll.objectsGroup
-            local bounds = objectsGroup.contentBounds
             if not scroll.horizontalScrollDisabled then
                 self.xStart = self.xStart or objectsGroup.x
-                local posX = self.xStart + event.x - event.xStart
-                local dxr = objectsGroup.x - bounds.xMax + scroll.scrollWidth + scroll.xMaxOffset
-                local dxl = objectsGroup.x - bounds.xMin + scroll.xMinOffset
-                posX = math.max(dxr, posX)
-                posX = math.min(dxl, posX)
-                objectsGroup.x = posX
+                objectsGroup.x = scroll:getLimitX(self.xStart + event.x - event.xStart)
             end
             if not scroll.verticalScrollDisabled then
                 self.yStart = self.yStart or objectsGroup.y
-                local posY = self.yStart + event.y - event.yStart
-                local dyr = objectsGroup.y - bounds.yMax + scroll.scrollHeight + scroll.yMaxOffset
-                local dyl = objectsGroup.y - bounds.yMin + scroll.yMinOffset
-                posY = math.max(dyr, posY)
-                posY = math.min(dyl, posY)
-                objectsGroup.y = posY
+                objectsGroup.y = scroll:getLimitY(self.yStart + event.y - event.yStart)
             end
         elseif event.phase == "ended" or event.phase == "cancelled" then
             display.getCurrentStage():setFocus(nil)
@@ -539,13 +555,23 @@ end
 Gui.createIcon = function(what, name)
     local what = what or "none"
     local name = name or Gui.settings.icons[what .. "Icon"]
-    local icon = display.newGroup()
     local size = Gui.settings.sizes.icon
-    icon.frame = display.newCircle(icon, 0, 0, Gui.settings.sizes.iconFrameWidth)
-    icon.frame:setFillColor(unpack(Gui.settings.colors.iconFrame[what]))
-    icon.frame.strokeWidth = Gui.settings.sizes.iconFrameStrokeWidth
-    icon.frame.stroke = Gui.settings.colors.iconFrame.stroke
-    icon.image = display.newImageRect(icon, name, system.ResourceDirectory, 2 * size, 2 * size)
+    local icon = Gui.createButton {
+        image = name,
+        imageWidth = 2 * size,
+        imageHeight = 2 * size,
+        width = Gui.settings.sizes.iconFrameWidth * 2,
+        height = Gui.settings.sizes.iconFrameWidth * 2,
+        cornerRadius = Gui.settings.sizes.iconFrameWidth,
+        stroke = {color = Gui.settings.colors.iconFrame.stroke, width = Gui.settings.sizes.iconFrameStrokeWidth},
+        defaultColor = Gui.settings.colors.iconFrame[what]
+    }
+
+    -- icon.frame = display.newCircle(icon, 0, 0, Gui.settings.sizes.iconFrameWidth)
+    -- icon.frame:setFillColor(unpack(Gui.settings.colors.iconFrame[what]))
+    -- icon.frame.strokeWidth = Gui.settings.sizes.iconFrameStrokeWidth
+    -- icon.frame.stroke = Gui.settings.colors.iconFrame.stroke
+    -- icon.image = display.newImageRect(icon, name, system.ResourceDirectory, 2 * size, 2 * size)
     local circlemask = Gui.settings.masks.cirlce
     icon.image:setMask(circlemask.mask)
     icon.image.maskScaleX = size * 2 / circlemask.width
@@ -603,6 +629,7 @@ Gui.displayhpbar = function(entity, key)
 end
 
 Gui.displayBattle = function(battle)
+    print("battle displayed")
     local scene = display.newGroup()
     battle.graphics = battle.graphics or {}
     battle.graphics.scene = scene
@@ -630,7 +657,7 @@ Gui.displayBattle = function(battle)
     local playerSide
     for _, k in pairs {"left", "right"} do
         for _, entity in pairs(battle[k]) do
-            if entity == battle.position.loc.world.players[1] then
+            if isPlayer(entity) then
                 playerSide = k
                 break
             end
@@ -670,6 +697,11 @@ Gui.displayBattle = function(battle)
 end
 
 Gui.displayBattleAction = function(battleAction)
+    local entity = battleAction.me
+    local battle = entity.battle
+    if not (battle and battle.graphics) then
+        return
+    end
     local battleActionSize = Gui.settings.sizes.battle.actionSize
     local image = display.newImageRect(battleAction.me.battle.graphics.battleActions,
                                        Gui.settings.catalogs.battleActionsImages .. battleAction.type .. ".png",
@@ -719,17 +751,26 @@ Gui.displayEntity = function(entity)
     icon:translate(entity.position.x, entity.position.y)
     icon.text = display.newText {
         parent = icon,
-        y = -icon.frame.path.radius * 1.05,
+        y = -Gui.settings.sizes.iconFrameWidth * 1.05,
         text = (entity.surname and (entity.surname .. " ") or "") .. entity.name,
         align = "center",
         font = native.systemFont,
-        fontSize = icon.frame.path.radius / 2
+        fontSize = Gui.settings.sizes.iconFrameWidth / 2
     }
     icon.text.anchorY = 1
-    icon:addEventListener("tap", function(event)
-        if event.time - (event.target.time or 0) < system.tapDelay then
-            local player = entity.position.loc.world.players[1]
-            player:move({x = event.target.x, y = event.target.y}, function()
+    icon.entity = entity
+    icon.onTap = function()
+        return true
+    end
+    icon.onDoubleTap = function(self, event)
+        local entity = self.entity
+        local player = entity.position.loc.world.players[1]
+        if player == entity then
+            return true
+        end
+        player:move({x = event.target.x, y = event.target.y}, function()
+            if math.abs(player.position.x - entity.position.x) < Gui.settings.sizes.iconFrameWidth * 2 and
+                math.abs(player.position.y - entity.position.y) < Gui.settings.sizes.iconFrameWidth then
                 local battle = entity.position.loc:newBattle{
                     left = {},
                     right = {},
@@ -737,18 +778,19 @@ Gui.displayEntity = function(entity)
                 }
                 battle:addEntity(player, "left")
                 battle:addEntity(entity, "right")
-
                 battle:run()
-            end)
-        end
-        event.target.time = event.time
+            end
+        end)
         return true
-    end)
+    end
     return icon
 end
 
+local function getPlayer(location)
+    return location.world.players[1]
+end
+
 Gui.displayLocation = function(location)
-    local location = location
     location.graphics = {}
     location.graphics.displayEntity = Gui.displayEntity
     location.graphics.displayBattleIcon = Gui.displayBattleIcon
@@ -760,22 +802,36 @@ Gui.displayLocation = function(location)
     if location.texture then
         texture = location:texture()
     else
-        texture = display.newRect(0, 0, location.width, location.height)
-        texture:setFillColor(0.6, 0.5, 0.3)
-        texture.anchorX, texture.anchorY = 0, 0
+        texture = display.newGroup()
+        local bg = display.newRect(0, 0, location.width, location.height)
+        bg:setFillColor(0.6, 0.5, 0.3)
+        bg.anchorX, bg.anchorY = 0, 0
+        texture:insert(bg)
     end
     texture:addEventListener("tap", function(event)
         local posX, posY = event.target:contentToLocal(event.x, event.y)
-        posX, posY = posX + event.target.width / 2, posY + event.target.height / 2
-        location.world.players[1]:move{x = posX, y = posY}
+        posX, posY = posX, posY
+        getPlayer(location):move{x = posX, y = posY}
     end)
     group:insert(texture)
     lgraphics.texture = texture
 
     for key, path in ipairs(location.path) do
-        path.graphics = {icon = Gui.createIcon("path")}
+        path.graphics = path.graphics or {}
+        path.graphics.icon = Gui.createIcon("path")
+        path.graphics.icon.path = path
+        path.graphics.icon.onTap = function()
+            return true
+        end
         path.graphics.icon:translate(path.position.x, path.position.y)
         group:insert(path.graphics.icon)
+        path.graphics.icon.onDoubleTap = function(self, event)
+            local player = self.path.position.loc.world.players[1]
+            player:move(self.path.position, function()
+                player:cross(self.path)
+            end)
+            return true
+        end
     end
     for key, battle in ipairs(location.battles) do
 
@@ -806,6 +862,7 @@ Gui.displayWorld = function(world)
     local location = player.position.loc
     world.graphics.displayLocation = Gui.displayLocation
     world.graphics.scroll:add(Gui.displayLocation(location).group)
+    world.graphics.scroll:scrollTo(player.graphics.icon.x, player.graphics.icon.y)
     --[[
     for key, path in pairs(location.path) do
         world.graphics.scroll:insert(Gui.displayLocation(val.loc).group)
@@ -849,8 +906,10 @@ Gui.updateItemInfo = function(item)
     info.list:add(info.rarity, num)
     -- info.list:hide(info.desc)
     -- info.list:show(info.desc)
-    info.durability.text = "Прочность: " .. item.durability ..
-                               (rawget(item, "durabilitymax") and "/" .. item.durabilitymax or "")
+    info.durability.text = "Прочность: " ..
+                               (item.durability and
+                                   (item.durability ..
+                                       (rawget(item, "durabilitymax") and ("/" .. item.durabilitymax) or "")) or "∞")
 end
 
 Gui.createInventory = function(world)
@@ -1032,9 +1091,9 @@ Gui.createInventory = function(world)
         info.count.anchorX = 0
         info.count.anchorY = 0
         list:add(info.count)
-        info.rarity = display.newColorText {
+        info.rarity = display.newText {
             parent = info,
-            text = "Качество: <#(0, ff, 0), [48], (0, 0, ff)>Эпическое",
+            text = "Качество: Эпическое",
             font = native.systemFont,
             fontSize = fontSize,
             x = x,
