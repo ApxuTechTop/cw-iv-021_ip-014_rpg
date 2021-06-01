@@ -51,7 +51,7 @@ local ItemDataBase = {
         critDamage = 1.5,
         accuracy = 1.2,
         cooldown = 1500,
-        durability = 15
+        durability = 300
     },
     wood_sword = {
         name = "Деревянный меч",
@@ -61,7 +61,7 @@ local ItemDataBase = {
         critDamage = 1.5,
         accuracy = 1.2,
         cooldown = 1500,
-        durability = 10
+        durability = 100
     },
     spear = {
         id = "spear",
@@ -99,7 +99,8 @@ local ItemDataBase = {
         damage = 2,
         critDamage = 1.2,
         accuracy = 1,
-        cooldown = 800
+        cooldown = 800,
+        cantDrop = true
     },
     shield = {
         name = "Обычный щит",
@@ -143,6 +144,12 @@ local ItemDataBase = {
         tags = {"Common", "Equipment", "Armor", "Legs"},
         armor = 1,
         durability = 25
+    },
+    leather_greaves = {
+        name = "Кожаные Поножи",
+        tags = {"Common", "Equipment", "Armor", "Legs"},
+        armor = 0.4,
+        durability = 19
     },
     leather_boots = {
         name = "Кожаные ботинки",
