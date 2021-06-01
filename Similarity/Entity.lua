@@ -12,6 +12,12 @@ local Storage = require(dir .. "Storage")
 local Item = Storage.Item
 local ItemDataBase = require(dir .. "ItemDataBase")
 
+local function isPlayer(entity)
+    return
+        entity.position and entity.position.loc and entity.position.loc.world and entity.position.loc.world.players and
+            entity == entity.position.loc.world.players[1]
+end
+
 local Entity = {}
 local battleBufferMeta
 
@@ -45,7 +51,11 @@ local battleActionMeta = {
 }
 
 battleBufferMeta = {
-
+    battleActionTimer = function(event)
+        local params = event.source.params
+        params.battleAction:event()
+        params.self:run()
+    end,
     __index = {
         add = function(self, type, me, enemy, item, event)
             local last = #self + 1
@@ -56,7 +66,7 @@ battleBufferMeta = {
             self[last].item = item
             self[last].event = event
             setmetatable(self[last], battleActionMeta)
-            if me.position and me.position.loc and me == me.position.loc.world.players[1] then
+            if me.position and me.position.loc and isPlayer(me) then
                 me.graphics.displayBattleAction(self[last]) -- todo
             else
                 self:run()
@@ -85,10 +95,8 @@ battleBufferMeta = {
                 timer.performWithDelay(reaction, function()
                     battleAction.me.battleActionCooldown = nil
                 end)
-                battleAction.timer = timer.performWithDelay(reaction, function()
-                    battleAction:event()
-                    self:run()
-                end)
+                battleAction.timer = timer.performWithDelay(reaction, battleBufferMeta.battleActionTimer)
+                battleAction.timer.params = {battleAction = battleAction, self = self}
             end
         end
     }
@@ -187,23 +195,34 @@ local entityMeta = {
         end,
 
         move = function(self, position, foo)
+            if self.position.loc then
+                position.x = math.max(0, position.x)
+                position.x = math.min(self.position.loc.width, position.x)
+                position.y = math.max(0, position.y)
+                position.y = math.min(self.position.loc.height, position.y)
+            end
             local distance = math.distance(self.position, position)
+            distance = distance > 0 and distance or 0.0000001
             local steps = math.ceil(distance / 100)
             local moveSpeedX = (position.x - self.position.x) / steps
             local moveSpeedY = (position.y - self.position.y) / steps
             self.transitions = self.transitions or {}
             if self.transitions.move then
                 transition.cancel(self.transitions.move)
+                self.position.x = self.graphics.icon.x or self.position.x
+                self.position.y = self.graphics.icon.y or self.position.y
             end
             self.timers = self.timers or {}
             if self.timers.move then
                 timer.cancel(self.timers.move)
             end
-            self.transitions.move = transition.to(self.graphics.icon, {
-                x = position.x,
-                y = position.y,
-                time = distance / self.moveSpeed * 1000
-            })
+            if self.graphics and self.graphics.icon and self.graphics.icon.removeSelf then
+                self.transitions.move = transition.to(self.graphics.icon, {
+                    x = position.x,
+                    y = position.y,
+                    time = distance / self.moveSpeed * 1000
+                })
+            end
             self.timers.move = timer.performWithDelay(distance / self.moveSpeed * 1000 / steps, function(event)
                 self.position.x = self.position.x + moveSpeedX
                 self.position.y = self.position.y + moveSpeedY
@@ -212,7 +231,21 @@ local entityMeta = {
                 end
             end, steps)
         end,
+        cross = function(self, path)
 
+            local oldLocation = self.position.loc
+            local world = oldLocation.world
+            local newLocation = path.another.position.loc or world[path.id]
+            oldLocation:removeEntity(self)
+            newLocation:addEntity(self, path.another.position)
+            if isPlayer(self) then
+                oldLocation.graphics.group:removeSelf()
+                local wg = world.graphics
+                wg.scroll:add(wg.displayLocation(newLocation).group)
+                wg.scroll:scrollTo(self.graphics.icon.x, self.graphics.icon.y)
+            end
+
+        end,
         getDamage = function(self, damage) -- TODO interface
             local armor = 0
             for k, v in pairs(self.equipment) do
@@ -221,7 +254,7 @@ local entityMeta = {
                 end
             end
             local totalDamage = (damage - armor) / (self.vitality or 1)
-            self:setHealth(self.health - ((totalDamage > 0.5) and totalDamage or 0.5))
+            self:setHealth(self.health - ((totalDamage > 0.05) and totalDamage or 0.05))
             for k, v in pairs(self.equipment) do
                 if k ~= "hands" then
                     if v:getHarm(damage * v.armor / armor) then
@@ -234,9 +267,23 @@ local entityMeta = {
             end
             return damage -- TODO
         end,
-
+        lookLoot = function(self)
+            local loots = {}
+            if not self.position.loc then
+                return loots
+            end
+            for _, loot in pairs(self.position.loc.loot) do
+                if math.distance(self.position, loot.position) < 100 then
+                    loots[#loots + 1] = loot
+                end
+            end
+            return loots
+        end,
         death = function(self)
-            -- drop
+            self.position.loc:newLoot({items = self.inventory, position = self.position})
+            if self.timers.think then
+                timer.cancel(self.timers.think)
+            end
             if self.spot then
                 self.spot:removeMob(self)
             end
@@ -252,6 +299,20 @@ local entityMeta = {
                 return true
             else
                 -- assert(false, "Didn't find entity to clear")
+            end
+            local location = self.position.loc
+            local world = location.world
+            local main_town = world.location.main_town
+            if isPlayer(self) then
+                if #main_town.entities > 0 then
+                    location.graphics.group:removeSelf()
+                    world.players[1] = main_town.entities[math.random(#main_town.entities)]
+                    local newPlayer = world.players[1]
+                    local newLocation = world.players[1].position.loc
+                    local wg = world.graphics
+                    wg.scroll:add(wg.displayLocation(newLocation).group)
+                    wg.scroll:scrollTo(newPlayer.graphics.icon.x, newPlayer.graphics.icon.y)
+                end
             end
         end,
         think = function(self)
@@ -272,6 +333,57 @@ local entityMeta = {
                         else
                             weapon:tryAttack(self, self.battle[enemySide][enemyNum])
                         end
+                    end
+                end
+            else
+                local loots = self:lookLoot()
+                for _, loot in pairs(loots) do
+                    for _, slot in pairs(loot.items.slots) do
+                        self.inventory:addItem(slot.item, slot.count)
+                    end
+                end
+                if not isPlayer(self) then
+                    if self.spot then
+                        for _, entity in pairs(self.position.loc.entities) do
+                            if not entity.spot then
+                                if math.distance(self.position, entity.position) < 1000 then
+                                    self:move({
+                                        x = entity.position.x + math.random(-50, 50),
+                                        y = entity.position.y + math.random(-50, 50)
+                                    }, function()
+                                        if math.distance(entity.position, self.position) > 100 then
+                                            return
+                                        end
+                                        local battle = entity.battle
+                                        if battle then
+                                            local entitySide = battle:getEntitySide(entity)
+                                            local mySide = entitySide == "left" and "right" or "left"
+                                            battle:addEntity(self, mySide)
+                                            return
+                                        end
+                                        local battle = entity.position.loc:newBattle{
+                                            left = {},
+                                            right = {},
+                                            position = {
+                                                loc = entity.position.loc,
+                                                x = entity.position.x,
+                                                y = entity.position.y
+                                            }
+                                        }
+                                        battle:addEntity(entity, "left")
+                                        battle:addEntity(self, "right")
+                                        battle:run()
+                                    end)
+                                    return
+                                end
+                            end
+                        end
+                    end
+                    if self.position.x and self.position.y then
+                        self:move({
+                            x = self.position.x + math.random(-1000, 1000),
+                            y = self.position.y + math.random(-1000, 1000)
+                        })
                     end
                 end
             end
@@ -348,7 +460,8 @@ Entity.new = function(options)
         inventory = Storage.new(), --
         equipment = {hands = {}}, --
         position = options.position or {}, --
-        battleBuffer = options.battleBuffer or {}
+        battleBuffer = options.battleBuffer or {},
+        moveSpeed = options.moveSpeed or 100
     }
     setmetatable(entity.battleBuffer, battleBufferMeta)
     setmetatable(entity, entityMeta)
@@ -365,11 +478,26 @@ Entity.new = function(options)
             entity:equip(item, k)
         end
     end
-    local location = entity.position.loc
-    if location and location.graphics and location.graphics.group then
-        location.graphics.group:insert(location.graphics.displayEntity(entity)) -- todo
-    end
+
     return entity
+end
+
+Entity.reload = function(entity)
+    setmetatable(entity, entityMeta)
+    setmetatable(entity.battleBuffer, battleBufferMeta)
+    for _, battleAction in pairs(entity.battleBuffer) do
+        setmetatable(battleAction, battleActionMeta)
+    end
+    Storage.reload(entity.inventory)
+    for key, equipment in pairs(entity.equipment) do
+        if key == "hands" then
+            for i, item in pairs(equipment) do
+                Item.reload(item)
+            end
+        else
+            Item.reload(equipment)
+        end
+    end
 end
 
 return Entity
