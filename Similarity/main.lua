@@ -16,8 +16,6 @@ local Entities = require("Entities")
 local cx, cy = display.contentCenterX, display.contentCenterY
 local gw, gh = display.contentWidth, display.contentHeight
 
-print(math.ceil(1, 100))
-
 system.tapDelay = 350
 
 local game = {settings = {music = true, sounds = true}}

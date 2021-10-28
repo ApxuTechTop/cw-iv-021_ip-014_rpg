@@ -368,7 +368,8 @@ local worldMeta = {
         run = function(self)
             for k, location in pairs(self.locations) do
                 for _, entity in pairs(location.entities) do
-                    timer.performWithDelay(2000, function()
+                    entity.timers = entity.timers or {}
+                    entity.timers.think = timer.performWithDelay(2000, function()
                         entity:think()
                     end, -1)
                 end
